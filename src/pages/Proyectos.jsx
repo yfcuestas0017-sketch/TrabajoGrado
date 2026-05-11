@@ -20,7 +20,8 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import { getSupabaseClient } from '../lib/supabase/client';
-import EditProjectModal from './EditProjectModal'; // ajusta la ruta
+import EditProjectModal from './EditProjectModal';
+import CrearProyecto from './CrearProyecto';
 import {
   hasSupabaseConfig,
   hasSupabaseConfigAttempt,
@@ -65,6 +66,7 @@ export function ProyectosPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -673,9 +675,9 @@ export function ProyectosPage() {
                 <Button
                   variant="primary"
                   icon={FilePlus2}
-                  onClick={() => showForm ? handleCloseForm() : setShowForm(true)}
+                  onClick={() => setShowCreateModal(true)}
                 >
-                  {showForm ? 'Cerrar formulario' : 'Agregar proyecto'}
+                  Agregar proyecto
                 </Button>
               )}
             </div>
@@ -1182,6 +1184,18 @@ export function ProyectosPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {showCreateModal && (
+        <CrearProyecto
+          statuses={statuses}
+          modalities={modalities}
+          lines={lines}
+          sublines={sublines}
+          user={user}
+          onClose={() => setShowCreateModal(false)}
+          onSaved={() => { setShowCreateModal(false); loadData(); }}
+        />
         )}
 
         {editModal && (
