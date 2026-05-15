@@ -1,27 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BarChart3,
-  BookOpen,
-  ChevronDown,
-  Download,
-  ExternalLink,
-  Eye,
-  FilePlus2,
-  Filter,
-  History,
-  Pencil,
-  Settings,
-  Trash2,
-  Upload,
-  Users,
-  X,
+  BarChart3, BookOpen, ChevronDown, Download, ExternalLink, Eye, FilePlus2, Filter, History, Pencil,
+  Settings, Trash2, Upload, Users, X,
 } from 'lucide-react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import { getSupabaseClient } from '../lib/supabase/client';
-import EditProjectModal from './EditProjectModal';
-import CrearProyecto from './CrearProyecto';
+import EditProjectModal from './EditProjectModal'; 
+import CreateProjectModal from './CrearProyecto'; 
 import {
   hasSupabaseConfig,
   hasSupabaseConfigAttempt,
@@ -32,7 +19,7 @@ import {
 // ── UTILIDAD ─────────────────────────────────────────────
 function generatePrefix(lineName) {
   if (!lineName) return 'PR';
-  // Palabras menores a ignorar al formar el acrónimo
+
   const ignoredWords = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'para', 'con', 'en']);
   const words = lineName.split(/\s+/);
   const letters = words
@@ -47,6 +34,9 @@ export function ProyectosPage() {
   const isStudent = user?.role?.toLowerCase() === 'estudiante';
   const isDocente = user?.role?.toLowerCase() === 'docente';
   const isLimitedUser = isStudent || isDocente;
+
+
+  const adminProgramId = user?.role?.toLowerCase() === 'administrador' ? (user?.programId ?? null) : null;
 
   const [filters, setFilters] = useState({
     search: '',
@@ -65,7 +55,6 @@ export function ProyectosPage() {
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
@@ -82,7 +71,7 @@ export function ProyectosPage() {
     coauthors: [],
   });
 
-  const [newCoauthorEmail, setNewCoauthorEmail] = useState('');
+  const [adminProgramName, setAdminProgramName] = useState('');
   const [verifyingCoauthor, setVerifyingCoauthor] = useState(false);
   
   const [editProjectId, setEditProjectId] = useState(null);
@@ -103,14 +92,14 @@ export function ProyectosPage() {
       coauthors: project.coauthors || [],
     });
     setEditProjectId(project.id);
-    setShowForm(true);
+    setShowCreateModal(true);
     setFormError('');
     setFormSuccess('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCloseForm = () => {
-    setShowForm(false);
+    setShowCreateModal(false);
     setEditProjectId(null);
     setFormData({
       title: '', code: '', statusId: '', modalityId: '', lineId: '', sublineId: '', letterLink: '', coauthors: [],
@@ -205,6 +194,20 @@ export function ProyectosPage() {
       skipProjects = true;
     }
 
+    // Administrador con programa asignado: solo proyectos de usuarios de su programa
+    if (adminProgramId !== null && !isLimitedUser) {
+      const { data: programUserProjects } = await supabase
+        .from('user_projects')
+        .select('project_id, users!inner(program_id)')
+        .eq('users.program_id', adminProgramId);
+      const programProjectIds = [...new Set((programUserProjects || []).map(r => r.project_id))];
+      if (programProjectIds.length > 0) {
+        projectsQuery = projectsQuery.in('project_id', programProjectIds);
+      } else {
+        skipProjects = true;
+      }
+    }
+
     const [projectsResponse, statusResponse, modalityResponse, linesResponse, sublinesResponse] =
       await Promise.all([
         skipProjects ? Promise.resolve({ data: [], error: null }) : projectsQuery,
@@ -283,8 +286,18 @@ export function ProyectosPage() {
     setLines(linesResponse.error ? [] : linesResponse.data ?? []);
     setSublines(sublinesResponse.error ? [] : sublinesResponse.data ?? []);
 
+    // Si es admin con programa, obtener el nombre del programa para mostrarlo
+    if (adminProgramId !== null) {
+      const { data: progData } = await supabase
+        .from('programs')
+        .select('name')
+        .eq('program_id', adminProgramId)
+        .maybeSingle();
+      if (progData?.name) setAdminProgramName(progData.name);
+    }
+
     setLoading(false);
-  }, [user?.id, user?.role, isLimitedUser]);
+  }, [user?.id, user?.role, isLimitedUser, adminProgramId]);
 
   useEffect(() => {
     loadData();
@@ -659,6 +672,7 @@ export function ProyectosPage() {
   };
 
   return (
+    <>
     <DashboardLayout title="Gestion de Proyectos" subtitle="">
       <div className="projects-page">
         <div className="projects-hero">
@@ -669,6 +683,12 @@ export function ProyectosPage() {
               <p className="section-subtitle">
                 Administra proyectos, consulta historial y exporta informacion.
               </p>
+              {adminProgramId !== null && (
+                  <div className="prog-filter-badge">
+                    <span className="prog-filter-dot" />
+                    Mostrando solo: <strong>{adminProgramName || 'tu programa'}</strong>
+                  </div>
+                )}
             </div>
             <div className="projects-actions">
               {!isDocente && (
@@ -702,202 +722,6 @@ export function ProyectosPage() {
         {error && (
           <div className="page-error">
             <span>{error}</span>
-          </div>
-        )}
-
-        {showForm && (
-          <div className="form-card">
-            <div className="form-header">
-              <div className="form-header-icon">
-                <FilePlus2 size={18} />
-              </div>
-              <div>
-                <h3>{editProjectId ? 'Editar proyecto' : 'Registrar proyecto'}</h3>
-                <p>{editProjectId ? 'Actualiza los datos del proyecto.' : 'Completa los datos para registrar el nuevo proyecto de grado.'}</p>
-              </div>
-            </div>
-
-            {(formError || formSuccess) && (
-              <div className={`form-alert${formError ? ' form-alert--error' : ''}`}>
-                <span>{formError || formSuccess}</span>
-              </div>
-            )}
-
-            <form className="form-grid" onSubmit={handleSaveProject}>
-              <div className="field">
-                <label className="field-label">Título del proyecto *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={handleFormChange('title')}
-                  className="field-input"
-                  placeholder="Ej: Sistema de gestión académica..."
-                  required
-                />
-              </div>
-              <div className="field">
-                <label className="field-label">Código (Autogenerado)</label>
-                <input
-                  type="text"
-                  value={isGeneratingCode ? 'Generando...' : formData.code}
-                  readOnly
-                  className="field-input"
-                  placeholder="Selecciona una línea de investigación"
-                  style={{ backgroundColor: 'var(--bg-secondary)', cursor: 'not-allowed', color: 'var(--text-secondary)' }}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label">Estado *</label>
-                <div className="select-wrap">
-                  <select
-                    className="field-input field-select"
-                    value={formData.statusId}
-                    onChange={handleFormChange('statusId')}
-                    required
-                  >
-                    <option value="">— Selecciona un estado —</option>
-                    {statuses.map((status) => (
-                      <option key={status.status_id} value={status.status_id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="select-chevron" />
-                </div>
-              </div>
-              <div className="field">
-                <label className="field-label">Modalidad *</label>
-                <div className="select-wrap">
-                  <select
-                    className="field-input field-select"
-                    value={formData.modalityId}
-                    onChange={handleFormChange('modalityId')}
-                    required
-                  >
-                    <option value="">— Selecciona una modalidad —</option>
-                    {modalities.map((modality) => (
-                      <option key={modality.modality_id} value={modality.modality_id}>
-                        {modality.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="select-chevron" />
-                </div>
-              </div>
-              <div className="field">
-                <label className="field-label">Línea de investigación</label>
-                <div className="select-wrap">
-                  <select
-                    className="field-input field-select"
-                    value={formData.lineId}
-                    onChange={handleFormChange('lineId')}
-                  >
-                    <option value="">— Selecciona una línea —</option>
-                    {lines.map((line) => (
-                      <option key={line.research_line_id} value={line.research_line_id}>
-                        {line.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="select-chevron" />
-                </div>
-              </div>
-              <div className="field">
-                <label className="field-label">Sublínea</label>
-                <div className="select-wrap">
-                  <select
-                    className="field-input field-select"
-                    value={formData.sublineId}
-                    onChange={handleFormChange('sublineId')}
-                    disabled={!formData.lineId}
-                  >
-                    <option value="">— Selecciona una sublínea —</option>
-                    {filteredSublines.map((subline) => (
-                      <option
-                        key={subline.research_subline_id}
-                        value={subline.research_subline_id}
-                      >
-                        {subline.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="select-chevron" />
-                </div>
-              </div>
-              <div className="field form-span">
-                <label className="field-label">Enlace de carta de presentación</label>
-                <input
-                  type="url"
-                  value={formData.letterLink}
-                  onChange={handleFormChange('letterLink')}
-                  className="field-input"
-                  placeholder="https://drive.google.com/..."
-                />
-              </div>
-
-              <div className="field form-span">
-                <label className="field-label">Co-autores del proyecto (opcional)</label>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                  <input
-                    type="email"
-                    value={newCoauthorEmail}
-                    onChange={(e) => { setNewCoauthorEmail(e.target.value); setFormError(''); }}
-                    className="field-input"
-                    placeholder="Correo del compañero (ej: juan@cesmag.edu.co)"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        verifyAndAddAuthor();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    loading={verifyingCoauthor}
-                    onClick={verifyAndAddAuthor}
-                  >
-                    Verificar y Agregar
-                  </Button>
-                </div>
-                {formData.coauthors.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                    {formData.coauthors.map(c => (
-                      <div key={c.id} style={{ 
-                        display: 'flex', alignItems: 'center', gap: '6px', 
-                        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-                        padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem' 
-                      }}>
-                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{c.name}</span>
-                        <span style={{ color: 'var(--text-muted)' }}>({c.email})</span>
-                        <button 
-                          type="button" 
-                          onClick={() => removeCoauthor(c.id)} 
-                          style={{ 
-                            background: 'transparent', border: 'none', color: 'var(--text-muted)', 
-                            cursor: 'pointer', padding: '0 4px', fontSize: '1.2rem', lineHeight: 1 
-                          }}
-                          title="Remover co-autor"
-                        >&times;</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="form-actions">
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={handleCloseForm}
-                >
-                  Cancelar
-                </Button>
-                <Button variant="primary" type="submit" loading={submitting}>
-                  {submitting ? 'Guardando...' : 'Guardar proyecto'}
-                </Button>
-              </div>
-            </form>
           </div>
         )}
 
@@ -1186,18 +1010,6 @@ export function ProyectosPage() {
           </div>
         )}
 
-        {showCreateModal && (
-        <CrearProyecto
-          statuses={statuses}
-          modalities={modalities}
-          lines={lines}
-          sublines={sublines}
-          user={user}
-          onClose={() => setShowCreateModal(false)}
-          onSaved={() => { setShowCreateModal(false); loadData(); }}
-        />
-        )}
-
         {editModal && (
         <EditProjectModal
           project={editModal}
@@ -1250,6 +1062,22 @@ export function ProyectosPage() {
           font-weight: 700;
           margin-bottom: 8px;
         }
+
+        .prog-filter-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          margin-top: 10px;
+          padding: 5px 12px;
+          background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+          border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, var(--border-color));
+          border-radius: 999px;
+          font-size: 0.78rem;
+          color: var(--text-secondary);
+        }
+
+        .prog-filter-badge strong { color: var(--accent-primary); }
+        .prog-filter-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-primary); flex-shrink: 0; }
 
         .section-title {
           font-family: var(--font-display);
@@ -2202,6 +2030,19 @@ export function ProyectosPage() {
       `}</style>
 
     </DashboardLayout>
+
+    {showCreateModal && (
+      <CreateProjectModal
+        statuses={statuses}
+        modalities={modalities}
+        lines={lines}
+        sublines={sublines}
+        onClose={() => setShowCreateModal(false)}
+        onSaved={() => { setShowCreateModal(false); loadData(); }}
+        user={user}
+      />
+    )}
+    </>
   );
 }
 

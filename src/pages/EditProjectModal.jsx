@@ -62,8 +62,10 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
   const [editingParticipant, setEditingParticipant] = useState(null); 
 
   // ── asesor ───────────────────────────────────────────────
-  const [allAdvisors, setAllAdvisors] = useState([]);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState('');
+  const [advisorError, setAdvisorError] = useState('');
+  const [advisorName, setAdvisorName] = useState('');
+  const [addingAdvisor, setAddingAdvisor] = useState(false);
 
   // ── acta ─────────────────────────────────────────────────
   const [actaLink, setActaLink] = useState('');
@@ -102,24 +104,7 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
     setLoadingParticipants(false);
   }, [project.id]);
 
-  const fetchAdvisors = useCallback(async () => {
-      const { data: docentes } = await supabase
-        .from('users')
-        .select('user_id, full_name, email')
-        .eq('role_id', 4); // 4 = docente
 
-      const { data: ocupados } = await supabase
-        .from('user_projects')
-        .select('user_id, project_role')
-        .eq('project_id', project.id)
-        .in('project_role', ['jurado', 'autor', 'coautor']);
-
-      const ocupadosIds = new Set((ocupados || []).map(r => r.user_id));
-
-  setAllAdvisors(
-    (docentes || []).filter(d => !ocupadosIds.has(d.user_id))
-  );
-}, [project.id]);
 
 
   // ── cargar historial ─────────────────────────────────────
@@ -152,9 +137,8 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
 
   useEffect(() => {
     fetchParticipants();
-    fetchAdvisors();
     fetchHistory();
-  }, [fetchParticipants, fetchAdvisors, fetchHistory]);
+  }, [fetchParticipants, fetchHistory]);
 
   // ── guardar proyecto base ────────────────────────────────
   const handleSave = async (e) => {
@@ -200,7 +184,7 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
     // Buscar por nombre completo (búsqueda insensible)
     const { data, error } = await supabase
       .from('users')
-      .select('user_id, full_name, email')
+      .select('user_id, full_name, email, user_roles(role_id)')
       .ilike('full_name', `%${name}%`)
       .limit(1);
     
@@ -210,8 +194,30 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
       return;
     }
     const user = data[0];
+    // Validar: solo docentes y directores pueden ser jurado (no estudiantes, role_id 3)
+    if (newParticipantRole === 'jurado') {
+      const roles = (user.user_roles || []).map(r => r.role_id);
+      const soloEstudiante = roles.length === 0 || (roles.length > 0 && roles.every(r => r === 3));
+      if (soloEstudiante) {
+        setParticipantError('Solo docentes o directores pueden ser asignados como jurado.');
+        setVerifyingParticipant(false);
+        return;
+      }
+    }
+    // Validar conflicto: si el rol a asignar es 'jurado' y el usuario ya es asesor, no permitir
+    if (newParticipantRole === 'jurado' && user.user_id === selectedAdvisorId) {
+      setParticipantError('Este docente ya es asesor del proyecto y no puede ser jurado.');
+      setVerifyingParticipant(false);
+      return;
+    }
     const exists = participants.find(p => p.userId === user.user_id);
     if (exists) {
+      // Validar conflicto al actualizar rol
+      if (newParticipantRole === 'jurado' && exists.role === 'asesor') {
+        setParticipantError('Este docente ya es asesor del proyecto y no puede ser jurado.');
+        setVerifyingParticipant(false);
+        return;
+      }
       // actualizar rol
       await supabase.from('user_projects').update({ project_role: newParticipantRole }).eq('project_id', project.id).eq('user_id', user.user_id);
     } else {
@@ -235,14 +241,51 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
     fetchParticipants();
   };
 
-  // ── cambiar asesor ───────────────────────────────────────
-  const handleChangeAdvisor = async (advisorId) => {
-    setSelectedAdvisorId(advisorId);
-    // eliminar asesor anterior
-    await supabase.from('user_projects').delete().eq('project_id', project.id).eq('project_role', 'asesor');
-    if (advisorId) {
-      await supabase.from('user_projects').insert({ project_id: project.id, user_id: advisorId, project_role: 'asesor' });
+  // ── agregar asesor por nombre ───────────────────────────
+  const handleAddAdvisor = async () => {
+    const name = advisorName.trim();
+    if (!name) return;
+    setAddingAdvisor(true);
+    setAdvisorError('');
+    const { data, error } = await supabase
+      .from('users')
+      .select('user_id, full_name, email, user_roles(role_id)')
+      .ilike('full_name', `%${name}%`)
+      .limit(1);
+    if (error || !data || data.length === 0) {
+      setAdvisorError('Usuario no encontrado en el sistema.');
+      setAddingAdvisor(false);
+      return;
     }
+    const found = data[0];
+    // Validar: solo docentes o directores pueden ser asesores (no estudiantes, role_id 3)
+    const rolesAsesor = (found.user_roles || []).map(r => r.role_id);
+    const soloEstudianteAsesor = rolesAsesor.length === 0 || rolesAsesor.every(r => r === 3);
+    if (soloEstudianteAsesor) {
+      setAdvisorError('Solo docentes o directores pueden ser asignados como asesor.');
+      setAddingAdvisor(false);
+      return;
+    }
+    const esJurado = participants.some(p => p.userId === found.user_id && p.role === 'jurado');
+    if (esJurado) {
+      setAdvisorError('Este docente ya es jurado del proyecto y no puede ser asesor.');
+      setAddingAdvisor(false);
+      return;
+    }
+    // eliminar asesor anterior e insertar el nuevo
+    await supabase.from('user_projects').delete().eq('project_id', project.id).eq('project_role', 'asesor');
+    await supabase.from('user_projects').insert({ project_id: project.id, user_id: found.user_id, project_role: 'asesor' });
+    setSelectedAdvisorId(found.user_id);
+    setAdvisorName('');
+    fetchParticipants();
+    setAddingAdvisor(false);
+  };
+
+  // ── quitar asesor ────────────────────────────────────────
+  const handleRemoveAdvisor = async () => {
+    await supabase.from('user_projects').delete().eq('project_id', project.id).eq('project_role', 'asesor');
+    setSelectedAdvisorId('');
+    setAdvisorName('');
     fetchParticipants();
   };
 
@@ -533,16 +576,34 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
                 <div className="epm-panel-header">
                   <span className="epm-panel-label">Asesor</span>
                 </div>
-                <div className="epm-asesor-row">
-                  {currentAdvisor && <Avatar name={currentAdvisor.name} size={28} />}
-                  <div className="epm-select-wrap" style={{ flex: 1 }}>
-                    <select value={selectedAdvisorId} onChange={e => handleChangeAdvisor(e.target.value)}>
-                      <option value="">Sin asesor asignado</option>
-                      {allAdvisors.map(a => <option key={a.user_id} value={a.user_id}>{a.full_name}</option>)}
-                    </select>
-                    <ChevronDown size={13} className="epm-chevron" />
+                {currentAdvisor && (
+                  <div className="epm-person-row">
+                    <Avatar name={currentAdvisor.name} size={30} />
+                    <div className="epm-person-info">
+                      <span className="epm-person-name">{currentAdvisor.name}</span>
+                      <span className="epm-person-role">Asesor</span>
+                    </div>
+                    <div className="epm-person-actions">
+                      <button className="epm-icon-btn epm-icon-btn--danger" title="Quitar asesor" onClick={handleRemoveAdvisor}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
+                )}
+                <div className="epm-add-row">
+                  <Plus size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                  <input
+                    className="epm-inline-input"
+                    placeholder="Nombre del asesor"
+                    value={advisorName}
+                    onChange={e => { setAdvisorName(e.target.value); setAdvisorError(''); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddAdvisor(); } }}
+                  />
+                  <button className="epm-add-btn" onClick={handleAddAdvisor} disabled={addingAdvisor}>
+                    {addingAdvisor ? <Loader2 size={12} className="epm-spin" /> : 'Asignar'}
+                  </button>
                 </div>
+                {advisorError && <p className="epm-inline-error">{advisorError}</p>}
               </div>
 
               {/* ── AGREGAR ACTA ── */}

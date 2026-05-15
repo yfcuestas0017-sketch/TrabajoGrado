@@ -4,8 +4,14 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import Button from '../components/ui/Button';
 import { getSupabaseClient } from '../lib/supabase/client';
 import { hasSupabaseConfig } from '../lib/supabase/config';
+import { useAuth } from '../context/AuthContext';
 
 export default function GestionDocente() {
+  const { user } = useAuth();
+
+  // Si el usuario es administrador y tiene programa asignado, solo verá ese programa
+  const adminProgramId = user?.role?.toLowerCase() === 'administrador' ? (user?.programId ?? null) : null;
+
   const [docentes, setDocentes] = useState([]);
   const [lines, setLines] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -47,12 +53,18 @@ export default function GestionDocente() {
     let docenteList = (roleData || [])
       .filter(r => r.users)
       .map(r => ({
-        user_id: r.user_id,
+        user_id: r.users.user_id || r.user_id,
         full_name: r.users.full_name || 'Sin nombre',
         email: r.users.email || '',
         program_id: r.users.program_id || null,
         program_name: r.users.programs?.name || null,
       }));
+
+    // ── FILTRO POR PROGRAMA DEL ADMINISTRADOR ──────────────────
+    // Si el admin pertenece a un programa específico, solo ve docentes de ese programa
+    if (adminProgramId !== null) {
+      docenteList = docenteList.filter(d => String(d.program_id) === String(adminProgramId));
+    }
 
     if (docenteList.length > 0) {
       const { data: assignments } = await supabase
@@ -74,8 +86,31 @@ export default function GestionDocente() {
 
     const { data: linesData } = await supabase
       .from('research_lines').select('research_line_id, name').order('name');
-    const { data: projectsData } = await supabase
-      .from('projects').select('project_id, title, code').order('title');
+
+    // ── PROYECTOS FILTRADOS POR PROGRAMA ───────────────────────
+    // Si el admin tiene programa, solo carga proyectos de ese programa
+    let projectsQuery = supabase.from('projects').select('project_id, title, code').order('title');
+    if (adminProgramId !== null) {
+      const { data: programUserProjects } = await supabase
+        .from('user_projects')
+        .select('project_id, users!inner(program_id)')
+        .eq('users.program_id', adminProgramId);
+      const programProjectIds = [...new Set((programUserProjects || []).map(r => r.project_id))];
+      if (programProjectIds.length > 0) {
+        projectsQuery = projectsQuery.in('project_id', programProjectIds);
+      } else {
+        // No hay proyectos para este programa
+        setDocentes(docenteList);
+        setLines(linesData || []);
+        setProjects([]);
+        const { data: programsData } = await supabase.from('programs').select('program_id, name').order('name');
+        setPrograms(programsData || []);
+        setLoading(false);
+        return;
+      }
+    }
+
+    const { data: projectsData } = await projectsQuery;
     const { data: programsData } = await supabase
       .from('programs').select('program_id, name').order('name');
 
@@ -84,7 +119,7 @@ export default function GestionDocente() {
     setProjects(projectsData || []);
     setPrograms(programsData || []);
     setLoading(false);
-  }, []);
+  }, [adminProgramId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -210,7 +245,6 @@ export default function GestionDocente() {
     setCreateError('');
     const supabase = getSupabaseClient();
 
-    // 1. Verificar si ya existe el email
     const { data: existing } = await supabase
       .from('users')
       .select('user_id')
@@ -223,7 +257,6 @@ export default function GestionDocente() {
       return;
     }
 
-    // 2. Crear el usuario en la tabla users
     const insertPayload = {
       full_name: createForm.full_name.trim(),
       email: createForm.email.trim().toLowerCase(),
@@ -243,7 +276,6 @@ export default function GestionDocente() {
       return;
     }
 
-    // 3. Asignar rol de docente (role_id = 4)
     const { error: roleErr } = await supabase
       .from('user_roles')
       .insert({ user_id: newUser.user_id, role_id: 4 });
@@ -357,6 +389,16 @@ export default function GestionDocente() {
               <span className="gd-eyebrow">Panel administrativo</span>
               <h2 className="gd-title">Gestión de Docentes</h2>
               <p className="gd-subtitle">Visualiza docentes, asigna líneas de investigación y vincúlalos como asesor o jurado.</p>
+              {/* Badge que muestra el programa filtrado (solo visible para admins con programa) */}
+              {adminProgramId !== null && programs.length > 0 && (() => {
+                const prog = programs.find(p => String(p.program_id) === String(adminProgramId));
+                return prog ? (
+                  <div className="gd-program-badge">
+                    <span className="gd-program-dot" />
+                    Mostrando solo: <strong>{prog.name}</strong>
+                  </div>
+                ) : null;
+              })()}
             </div>
             <div className="gd-actions">
               <Button variant="primary" onClick={handleOpenCreateModal}>
@@ -644,6 +686,11 @@ function GDStyle() {
       .gd-eyebrow { display:inline-flex; font-size:.7rem; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); margin-bottom:8px; }
       .gd-title { font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:var(--text-primary); letter-spacing:-.02em; }
       .gd-subtitle { color:var(--text-secondary); font-size:.9rem; margin-top:6px; }
+
+      /* Badge de programa filtrado */
+      .gd-program-badge { display:inline-flex; align-items:center; gap:7px; margin-top:10px; padding:5px 12px; background:color-mix(in srgb,var(--accent-primary)12%,transparent); border:1px solid color-mix(in srgb,var(--accent-primary)30%,var(--border-color)); border-radius:999px; font-size:.78rem; color:var(--text-secondary); }
+      .gd-program-badge strong { color:var(--accent-primary); }
+      .gd-program-dot { width:7px; height:7px; border-radius:50%; background:var(--accent-primary); flex-shrink:0; }
 
       .gd-meta { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
       .gd-meta-card { background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--border-radius-lg); padding:14px 16px; display:flex; flex-direction:column; gap:4px; box-shadow:var(--shadow-sm); }

@@ -63,6 +63,7 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
   // ── asesor ───────────────────────────────────────────────
   const [allAdvisors, setAllAdvisors] = useState([]);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState('');
+  const [advisorError, setAdvisorError] = useState('');
 
   const supabase = getSupabaseClient();
 
@@ -118,7 +119,7 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
     setParticipantError('');
     const { data, error } = await supabase
       .from('users')
-      .select('user_id, full_name, email')
+      .select('user_id, full_name, email, user_roles(role_id)')
       .ilike('full_name', `%${name}%`)
       .limit(1);
     if (error || !data || data.length === 0) {
@@ -130,6 +131,22 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
     const exists = pendingParticipants.find(p => p.userId === found.user_id);
     if (exists) {
       setParticipantError('Este usuario ya fue agregado.');
+      setVerifyingParticipant(false);
+      return;
+    }
+    // Validar: solo docentes o directores pueden ser jurado (no estudiantes, role_id 3)
+    if (newParticipantRole === 'jurado') {
+      const rolesFound = (found.user_roles || []).map(r => r.role_id);
+      const soloEstudiante = rolesFound.length === 0 || rolesFound.every(r => r === 3);
+      if (soloEstudiante) {
+        setParticipantError('Solo docentes o directores pueden ser asignados como jurado.');
+        setVerifyingParticipant(false);
+        return;
+      }
+    }
+    // Validar: si el rol a asignar es 'jurado' y el usuario ya es el asesor seleccionado, no permitir
+    if (newParticipantRole === 'jurado' && found.user_id === selectedAdvisorId) {
+      setParticipantError('Este docente ya es asesor del proyecto y no puede ser jurado.');
       setVerifyingParticipant(false);
       return;
     }
@@ -464,13 +481,23 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
                 </div>
                 <div className="epm-asesor-row">
                   <div className="epm-select-wrap" style={{ flex: 1 }}>
-                    <select value={selectedAdvisorId} onChange={e => setSelectedAdvisorId(e.target.value)}>
+                    <select value={selectedAdvisorId} onChange={e => {
+                      const id = e.target.value;
+                      const esJurado = pendingParticipants.some(p => p.userId === id && p.role === 'jurado');
+                      if (esJurado) {
+                        setAdvisorError('Este docente ya es jurado del proyecto y no puede ser asesor.');
+                        return;
+                      }
+                      setAdvisorError('');
+                      setSelectedAdvisorId(id);
+                    }}>
                       <option value="">Sin asesor asignado</option>
                       {allAdvisors.map(a => <option key={a.user_id} value={a.user_id}>{a.full_name}</option>)}
                     </select>
                     <ChevronDown size={13} className="epm-chevron" />
                   </div>
                 </div>
+                {advisorError && <p className="epm-inline-error">{advisorError}</p>}
               </div>
 
             </div>{/* end right */}
