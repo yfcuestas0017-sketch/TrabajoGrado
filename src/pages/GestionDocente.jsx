@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, ChevronDown, Mail, Pencil, Search, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, Mail, Pencil, Search, Trash2, UserPlus, Users, X } from 'lucide-react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import Button from '../components/ui/Button';
 import { getSupabaseClient } from '../lib/supabase/client';
@@ -30,11 +30,14 @@ export default function GestionDocente() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
-  // Create docente modal state
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ full_name: '', email: '', password: '', program_id: '' });
-  const [createError, setCreateError] = useState('');
-  const [createSubmitting, setCreateSubmitting] = useState(false);
+  // Add docente modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addSearchEmail, setAddSearchEmail] = useState('');
+  const [addSearchResult, setAddSearchResult] = useState(null);
+  const [addSearching, setAddSearching] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [addSuccess, setAddSuccess] = useState('');
+  const [addSubmitting, setAddSubmitting] = useState(false);
 
   // Detail panel state
   const [detailDocente, setDetailDocente] = useState(null);
@@ -221,73 +224,105 @@ export default function GestionDocente() {
     return all.filter(a => a.project_role === activeFilter);
   };
 
-  // ── CREATE DOCENTE ──
-  const handleOpenCreateModal = () => {
-    setCreateForm({ full_name: '', email: '', password: '', program_id: '' });
-    setCreateError('');
-    setShowCreateModal(true);
+  // ── AGREGAR DOCENTE ──
+  const handleOpenAddModal = () => {
+    setAddSearchEmail('');
+    setAddSearchResult(null);
+    setAddError('');
+    setAddSuccess('');
+    setAddSearching(false);
+    setAddSubmitting(false);
+    setShowAddModal(true);
   };
 
-  const handleCloseCreateModal = () => {
-    setShowCreateModal(false);
-    setCreateForm({ full_name: '', email: '', password: '', program_id: '' });
-    setCreateError('');
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+    setAddSearchEmail('');
+    setAddSearchResult(null);
+    setAddError('');
+    setAddSuccess('');
+    setAddSearching(false);
+    setAddSubmitting(false);
   };
 
-  const handleCreateDocente = async (e) => {
+  const handleSearchAdd = async (e) => {
     e.preventDefault();
-    if (!createForm.full_name.trim()) { setCreateError('El nombre completo es obligatorio.'); return; }
-    if (!createForm.email.trim()) { setCreateError('El correo electrónico es obligatorio.'); return; }
+    const email = addSearchEmail.trim().toLowerCase();
+    if (!email) { setAddError('Ingresa un correo electrónico.'); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(createForm.email.trim())) { setCreateError('Ingresa un correo electrónico válido.'); return; }
+    if (!emailRegex.test(email)) { setAddError('Ingresa un correo electrónico válido.'); return; }
 
-    setCreateSubmitting(true);
-    setCreateError('');
+    setAddSearching(true);
+    setAddError('');
+    setAddSuccess('');
+    setAddSearchResult(null);
+
     const supabase = getSupabaseClient();
-
-    const { data: existing } = await supabase
+    const { data: userRow, error: userErr } = await supabase
       .from('users')
-      .select('user_id')
-      .eq('email', createForm.email.trim().toLowerCase())
+      .select('user_id, full_name, email, program_id, programs(name)')
+      .eq('email', email)
       .maybeSingle();
 
-    if (existing) {
-      setCreateError('Ya existe un usuario registrado con ese correo electrónico.');
-      setCreateSubmitting(false);
-      return;
-    }
-
-    const insertPayload = {
-      full_name: createForm.full_name.trim(),
-      email: createForm.email.trim().toLowerCase(),
-      ...(createForm.password.trim() && { password_hash: createForm.password.trim() }),
-      ...(createForm.program_id && { program_id: Number(createForm.program_id) }),
-    };
-
-    const { data: newUser, error: userErr } = await supabase
-      .from('users')
-      .insert(insertPayload)
-      .select('user_id')
-      .single();
-
     if (userErr) {
-      setCreateError(`Error al crear el usuario: ${userErr.message}`);
-      setCreateSubmitting(false);
+      setAddError(`No fue posible buscar el usuario: ${userErr.message}`);
+      setAddSearching(false);
       return;
     }
+
+    if (!userRow) {
+      setAddError('No se encontró un usuario con ese correo.');
+      setAddSearching(false);
+      return;
+    }
+
+    if (adminProgramId !== null && String(userRow.program_id) !== String(adminProgramId)) {
+      setAddError('El usuario no pertenece a tu programa.');
+      setAddSearching(false);
+      return;
+    }
+
+    const { data: roleRow } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('user_id', userRow.user_id)
+      .eq('role_id', 4)
+      .maybeSingle();
+
+    const alreadyDocente = Boolean(roleRow);
+    setAddSearchResult({
+      ...userRow,
+      program_name: userRow.programs?.name || null,
+      alreadyDocente,
+    });
+    setAddSuccess(alreadyDocente
+      ? 'Este usuario ya tiene el rol de Docente.'
+      : 'Usuario encontrado. Puedes agregarlo como docente.');
+    setAddSearching(false);
+  };
+
+  const handleAddDocente = async () => {
+    if (!addSearchResult) { setAddError('Busca un usuario primero.'); return; }
+    if (addSearchResult.alreadyDocente) { setAddError('Este usuario ya es docente.'); return; }
+
+    setAddSubmitting(true);
+    setAddError('');
+    setAddSuccess('');
+    const supabase = getSupabaseClient();
 
     const { error: roleErr } = await supabase
       .from('user_roles')
-      .insert({ user_id: newUser.user_id, role_id: 4 });
+      .insert({ user_id: addSearchResult.user_id, role_id: 4 });
 
     if (roleErr) {
-      setCreateError(`Usuario creado pero ocurrió un error al asignar el rol: ${roleErr.message}`);
-      setCreateSubmitting(false);
+      setAddError(`No se pudo agregar el rol de docente: ${roleErr.message}`);
+      setAddSubmitting(false);
       return;
     }
 
-    setCreateSubmitting(false);
-    handleCloseCreateModal();
+    setAddSearchResult((prev) => prev ? { ...prev, alreadyDocente: true } : prev);
+    setAddSuccess('Docente agregado correctamente.');
+    setAddSubmitting(false);
     loadData();
   };
 
@@ -295,89 +330,79 @@ export default function GestionDocente() {
     <DashboardLayout title="Gestión de Docentes" subtitle="">
       <div className="gd-page">
 
-        {/* ── MODAL CREAR DOCENTE ── */}
-        {showCreateModal && (
-          <div className="gd-modal-overlay" onClick={handleCloseCreateModal}>
+        {/* ── MODAL AGREGAR DOCENTE ── */}
+        {showAddModal && (
+          <div className="gd-modal-overlay" onClick={handleCloseAddModal}>
             <div className="gd-modal" onClick={e => e.stopPropagation()}>
               <div className="gd-modal-header">
                 <div className="gd-modal-icon"><UserPlus size={18} /></div>
                 <div>
-                  <h3>Crear nuevo docente</h3>
-                  <p>Completa los datos para registrar un nuevo docente en el sistema.</p>
+                  <h3>Agregar docente existente</h3>
+                  <p>Busca por correo y agrega el rol de Docente si el usuario ya existe.</p>
                 </div>
-                <button className="gd-modal-close" type="button" onClick={handleCloseCreateModal}>
+                <button className="gd-modal-close" type="button" onClick={handleCloseAddModal}>
                   <X size={18} />
                 </button>
               </div>
 
-              {createError && (
-                <div className="form-alert form-alert--error">{createError}</div>
+              {(addError || addSuccess) && (
+                <div className={`form-alert${addError ? ' form-alert--error' : ''}`}>
+                  <span>{addError || addSuccess}</span>
+                </div>
               )}
 
-              <form className="form-grid" onSubmit={handleCreateDocente}>
-                <div className="field form-span">
-                  <label className="field-label">Nombre completo *</label>
-                  <input
-                    className="field-input"
-                    type="text"
-                    placeholder="Ej: María García López"
-                    value={createForm.full_name}
-                    onChange={e => { setCreateForm(p => ({ ...p, full_name: e.target.value })); setCreateError(''); }}
-                    autoFocus
-                  />
-                </div>
-
+              <form className="gd-add-form" onSubmit={handleSearchAdd}>
                 <div className="field form-span">
                   <label className="field-label">Correo electrónico *</label>
                   <input
                     className="field-input"
                     type="email"
                     placeholder="docente@universidad.edu"
-                    value={createForm.email}
-                    onChange={e => { setCreateForm(p => ({ ...p, email: e.target.value })); setCreateError(''); }}
+                    value={addSearchEmail}
+                    onChange={e => { setAddSearchEmail(e.target.value); setAddError(''); setAddSuccess(''); }}
+                    autoFocus
                   />
                 </div>
-
-                <div className="field form-span">
-                  <label className="field-label">Programa</label>
-                  <div className="select-wrap">
-                    <select
-                      className="field-input field-select"
-                      value={createForm.program_id}
-                      onChange={e => setCreateForm(p => ({ ...p, program_id: e.target.value }))}
-                    >
-                      <option value="">— Sin programa asignado —</option>
-                      {programs.map(p => (
-                        <option key={p.program_id} value={p.program_id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} className="select-chevron" />
-                  </div>
-                </div>
-
-                <div className="field form-span">
-                  <label className="field-label">Contraseña inicial</label>
-                  <input
-                    className="field-input"
-                    type="password"
-                    placeholder="Contraseña temporal (opcional)"
-                    value={createForm.password}
-                    onChange={e => setCreateForm(p => ({ ...p, password: e.target.value }))}
-                  />
-                  <span className="field-hint">
-                    Se asignará automáticamente el rol de Docente al guardar.
-                  </span>
-                </div>
-
-                <div className="form-actions">
-                  <Button variant="ghost" type="button" onClick={handleCloseCreateModal}>
+                <div className="gd-add-actions">
+                  <Button variant="ghost" type="button" onClick={handleCloseAddModal}>
                     Cancelar
                   </Button>
-                  <Button variant="primary" type="submit" loading={createSubmitting}>
-                    {createSubmitting ? 'Creando...' : 'Crear Docente'}
+                  <Button variant="primary" type="submit" loading={addSearching}>
+                    {addSearching ? 'Buscando...' : 'Buscar usuario'}
                   </Button>
                 </div>
               </form>
+
+              {addSearchResult && (
+                <div className="gd-add-result">
+                  <div className="gd-add-avatar">
+                    {addSearchResult.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <div className="gd-add-info">
+                    <span className="gd-add-name">{addSearchResult.full_name || 'Sin nombre'}</span>
+                    <span className="gd-add-email">{addSearchResult.email}</span>
+                    {addSearchResult.program_name && (
+                      <span className="gd-add-program">{addSearchResult.program_name}</span>
+                    )}
+                  </div>
+                  <div className={`gd-add-status${addSearchResult.alreadyDocente ? ' gd-add-status--done' : ''}`}>
+                    <Check size={14} />
+                    {addSearchResult.alreadyDocente ? 'Docente' : 'Listo para agregar'}
+                  </div>
+                </div>
+              )}
+
+              <div className="gd-add-actions" style={{ marginTop: 14 }}>
+                <Button
+                  variant="primary"
+                  type="button"
+                  onClick={handleAddDocente}
+                  loading={addSubmitting}
+                  disabled={!addSearchResult || addSearchResult.alreadyDocente}
+                >
+                  {addSearchResult?.alreadyDocente ? 'Ya es docente' : (addSubmitting ? 'Agregando...' : 'Agregar Docente')}
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -401,9 +426,9 @@ export default function GestionDocente() {
               })()}
             </div>
             <div className="gd-actions">
-              <Button variant="primary" onClick={handleOpenCreateModal}>
+              <Button variant="primary" onClick={handleOpenAddModal}>
                 <UserPlus size={15} style={{ marginRight: 6 }} />
-                Crear Docente
+                Agregar Docente
               </Button>
             </div>
           </div>
@@ -742,6 +767,36 @@ function GDStyle() {
       .gd-modal-close:hover { background:var(--bg-secondary); color:var(--text-primary); }
 
       .field-hint { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
+
+      .gd-add-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .gd-add-actions { grid-column:span 2; display:flex; justify-content:flex-end; gap:10px; }
+      .gd-add-result {
+        margin-top:14px; padding:12px 14px;
+        display:flex; align-items:center; gap:12px;
+        border:1px solid var(--border-color); border-radius:var(--border-radius-md);
+        background:var(--bg-secondary);
+      }
+      .gd-add-avatar {
+        width:42px; height:42px; border-radius:12px;
+        background:linear-gradient(135deg, var(--accent-primary), color-mix(in srgb,var(--accent-primary)60%,#000));
+        color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;
+        flex-shrink:0;
+      }
+      .gd-add-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .gd-add-name { font-size:.88rem; font-weight:700; color:var(--text-primary); }
+      .gd-add-email { font-size:.78rem; color:var(--text-muted); }
+      .gd-add-program { font-size:.74rem; color:var(--accent-primary); font-weight:600; }
+      .gd-add-status {
+        margin-left:auto; display:inline-flex; align-items:center; gap:6px;
+        font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+        padding:4px 8px; border-radius:999px;
+        background:color-mix(in srgb,var(--accent-info)18%,transparent);
+        color:var(--accent-info);
+      }
+      .gd-add-status--done {
+        background:color-mix(in srgb,var(--accent-success)18%,transparent);
+        color:var(--accent-success);
+      }
 
       /* ── FORM ── */
       .form-card { background:var(--bg-card); border:1.5px solid color-mix(in srgb,var(--accent-primary)28%,var(--border-color)); border-radius:var(--border-radius-lg); padding:22px 24px; box-shadow:0 0 0 4px color-mix(in srgb,var(--accent-primary)6%,transparent),var(--shadow-sm); animation:fadeIn .25s ease; }

@@ -3,6 +3,7 @@ import {
   BarChart3, BookOpen, ChevronDown, Download, ExternalLink, Eye, FilePlus2, Filter, History, Pencil,
   Settings, Trash2, Upload, Users, X,
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
@@ -31,6 +32,8 @@ function generatePrefix(lineName) {
 
 export function ProyectosPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isStudent = user?.role?.toLowerCase() === 'estudiante';
   const isDocente = user?.role?.toLowerCase() === 'docente';
   const isLimitedUser = isStudent || isDocente;
@@ -302,6 +305,16 @@ export function ProyectosPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const targetId = location.state?.projectId;
+    if (!targetId || projects.length === 0) return;
+    const target = projects.find((project) => String(project.id) === String(targetId));
+    if (target) {
+      setDetailModal(target);
+      navigate('.', { replace: true, state: {} });
+    }
+  }, [location.state, navigate, projects]);
 
   useEffect(() => {
     if (!selectedId) return;
