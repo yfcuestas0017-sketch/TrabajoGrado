@@ -9,7 +9,7 @@
         .login-left {
           flex: 1;
           background-image:
-            linear-gradient(180deg, rgba(8,12,18,0.2) 0%, rgba(8,12,18,0.68) 100%),
+            linear-gradient(135deg, rgba(31, 91, 163, 0.88) 0%, rgba(44, 57, 103, 0.95) 100%),
             url('/login/SedeCentroUCESMAG.webp');
           background-size: cover;
           background-position: center;
@@ -25,7 +25,7 @@
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(135deg,rgba(0,0,0,0.18) 0%,rgba(0,0,0,0.08) 42%,rgba(0,0,0,0.56) 100%);
+          background: radial-gradient(circle at 10% 20%, rgba(224, 15, 56, 0.15) 0%, transparent 50%);
           pointer-events: none;
         }
         .login-left::after {

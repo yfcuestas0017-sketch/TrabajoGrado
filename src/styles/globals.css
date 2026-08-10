@@ -6,47 +6,59 @@
 
 /* ---- DEFAULT THEME (Dark Slate + Amber) ---- */
 :root {
+  /* Institutional Color Palette */
+  --inst-blue-1: #1F5BA3;
+  --inst-blue-2: #2C3967;
+  --inst-red-1: #BA1828;
+  --inst-red-2: #E00F38;
+  --inst-white: #FFFFFF;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #1F5BA3 0%, #2C3967 100%);
+  --gradient-secondary: linear-gradient(135deg, #BA1828 0%, #E00F38 100%);
+  --gradient-accent: linear-gradient(135deg, #2C3967 0%, #1F5BA3 50%, #E00F38 100%);
+
   /* Sidebar & Layout */
-  --sidebar-bg: #374e87;
-  --sidebar-text: #a0a8bc;
-  --sidebar-text-active: #ffffff;
-  --sidebar-accent: #e73a51;
-  --sidebar-hover: rgba(245, 166, 35, 0.08);
-  --sidebar-active-bg: rgba(245, 166, 35, 0.12);
-  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-bg: linear-gradient(180deg, #1F5BA3 0%, #2C3967 100%);
+  --sidebar-text: #FFFFFF;
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-accent: #E00F38;
+  --sidebar-hover: rgba(255, 255, 255, 0.12);
+  --sidebar-active-bg: rgba(224, 15, 56, 0.35);
+  --sidebar-border: rgba(255, 255, 255, 0.15);
   --sidebar-width: 260px;
 
   /* Main Content */
-  --bg-primary: #f7f6f2;
+  --bg-primary: #f2f5f9;
   --bg-secondary: #ffffff;
   --bg-card: #ffffff;
-  --bg-header: rgba(247, 246, 242, 0.88);
+  --bg-header: rgba(255, 255, 255, 0.90);
 
   /* Text */
-  --text-primary: #171a22;
-  --text-secondary: #5e6675;
-  --text-muted: #8a93a3;
+  --text-primary: #182238;
+  --text-secondary: #4a5773;
+  --text-muted: #7987a5;
   --text-inverse: #ffffff;
 
   /* Accents & Buttons */
-  --accent-primary: #c62847;
-  --accent-primary-hover: #b31f3f;
-  --accent-secondary: #1a1d27;
-  --accent-secondary-hover: #2d3240;
-  --accent-danger: #ef4444;
-  --accent-success: #22c55e;
-  --accent-info: #3b82f6;
+  --accent-primary: #1F5BA3;
+  --accent-primary-hover: #2C3967;
+  --accent-secondary: #BA1828;
+  --accent-secondary-hover: #E00F38;
+  --accent-danger: #E00F38;
+  --accent-success: #10b981;
+  --accent-info: #1F5BA3;
 
   /* Borders & Shadows */
-  --border-color: #d9dfe8;
+  --border-color: #dbe3ee;
   --border-radius-sm: 8px;
   --border-radius-md: 12px;
   --border-radius-lg: 16px;
   --border-radius-xl: 24px;
 
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-lg: 0 10px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-sm: 0 2px 4px rgba(31, 91, 163, 0.05);
+  --shadow-md: 0 6px 20px rgba(44, 57, 103, 0.08), 0 2px 6px rgba(31, 91, 163, 0.04);
+  --shadow-lg: 0 12px 48px rgba(31, 91, 163, 0.12), 0 4px 16px rgba(186, 24, 40, 0.06);
 
   /* Typography */
   --font-display: 'IBM Plex Serif', Georgia, serif;

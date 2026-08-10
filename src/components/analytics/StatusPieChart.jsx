@@ -1,16 +1,14 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const COLORS = [
-  'var(--accent-primary)',
-  '#3b82f6',
-  '#22c55e',
-  '#f59e0b',
-  '#a855f7',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16',
+  '#1F5BA3',
+  '#BA1828',
+  '#2C3967',
+  '#E00F38',
+  '#2563eb',
+  '#dc2626',
+  '#1d4ed8',
+  '#9f1239',
 ];
 
 export default function StatusPieChart({ data }) {

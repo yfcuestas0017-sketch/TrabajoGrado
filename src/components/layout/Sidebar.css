@@ -57,7 +57,7 @@
           .sidebar-logo-name {
             font-size: 0.95rem;
             font-weight: 700;
-            color: var(--sidebar-text-active);
+            color: #ffffff;
             white-space: nowrap;
             letter-spacing: -0.02em;
             margin-bottom: 2px;
@@ -65,7 +65,8 @@
 
           .sidebar-logo-sub {
             font-size: 0.65rem;
-            color: var(--sidebar-text);
+            color: #ffffff;
+            opacity: 0.9;
             white-space: nowrap;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -80,7 +81,7 @@
             background: var(--sidebar-bg);
             border: 1px solid var(--sidebar-border);
             border-radius: 50%;
-            color: var(--sidebar-text);
+            color: #ffffff;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -90,7 +91,7 @@
           }
 
           .sidebar-toggle:hover {
-            color: var(--sidebar-text-active);
+            color: #ffffff;
             background: var(--sidebar-hover);
           }
 
@@ -105,11 +106,11 @@
           }
 
           .sidebar-section-label {
-            font-size: 0.6rem;
+            font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--sidebar-text);
-            opacity: 0.5;
+            color: #ffffff;
+            opacity: 0.85;
             padding: 8px 8px 4px;
             display: block;
           }
@@ -120,7 +121,7 @@
             gap: 10px;
             padding: 9px 10px;
             border-radius: var(--border-radius-sm);
-            color: var(--sidebar-text);
+            color: #ffffff;
             text-decoration: none;
             font-size: 0.875rem;
             font-weight: 500;
@@ -130,18 +131,20 @@
           }
 
           .sidebar-link:hover {
-            color: var(--sidebar-text-active);
+            color: #ffffff;
             background: var(--sidebar-hover);
           }
 
           .sidebar-link--active {
-            color: var(--sidebar-accent) !important;
+            color: #ffffff !important;
             background: var(--sidebar-active-bg) !important;
-            font-weight: 600;
+            font-weight: 700;
+            box-shadow: inset 3px 0 0 #E00F38;
           }
 
           .sidebar-link svg {
             flex-shrink: 0;
+            color: #ffffff;
           }
 
           .sidebar-bottom {
@@ -159,15 +162,15 @@
             padding: 10px 8px;
             margin-top: 8px;
             border-radius: var(--border-radius-sm);
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(255, 255, 255, 0.08);
             overflow: hidden;
           }
 
           .sidebar-user-avatar {
             width: 32px;
             height: 32px;
-            background: var(--sidebar-accent);
-            color: #000;
+            background: #E00F38;
+            color: #ffffff;
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -188,7 +191,7 @@
           .sidebar-user-name {
             font-size: 0.8rem;
             font-weight: 600;
-            color: var(--sidebar-text-active);
+            color: #ffffff;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -196,14 +199,15 @@
 
           .sidebar-user-role {
             font-size: 0.65rem;
-            color: var(--sidebar-text);
+            color: #ffffff;
+            opacity: 0.85;
             text-transform: capitalize;
           }
 
           .sidebar-logout {
             background: none;
             border: none;
-            color: var(--sidebar-text);
+            color: #ffffff;
             cursor: pointer;
             padding: 4px;
             border-radius: 6px;
@@ -214,7 +218,7 @@
           }
 
           .sidebar-logout:hover {
-            color: var(--accent-danger);
+            color: #E00F38;
           }
 
           @media (max-width: 768px) {
