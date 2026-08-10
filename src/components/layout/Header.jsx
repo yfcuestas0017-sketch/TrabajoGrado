@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import ThemePanel from '../ui/ThemePanel';
 import { useAuth } from '../../context/AuthContext';
-import { getSupabaseClient } from '../../lib/supabase/client';
-import { hasSupabaseConfig } from '../../lib/supabase/config';
+import api from '../../lib/api';
 import './Header.css';
 
 export default function Header({ title, subtitle }) {
@@ -23,7 +22,7 @@ export default function Header({ title, subtitle }) {
     let mounted = true;
 
     const loadNotifications = async () => {
-      if (!hasSupabaseConfig || !user?.id) {
+      if (!user?.id) {
         if (mounted) setAssignedProjects([]);
         return;
       }
@@ -32,28 +31,22 @@ export default function Header({ title, subtitle }) {
       setNotifError('');
 
       try {
-        const supabase = getSupabaseClient();
-        const { data, error } = await supabase
-          .from('user_projects')
-          .select('project_role, projects(project_id, title, code, created_at)')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false, foreignTable: 'projects' });
+        const allProjects = await api.getProjects();
+        // Filter projects where current user is participant
+        const userProjects = (allProjects || []).filter(p =>
+          (p.user_projects || []).some(up => String(up.user_id) === String(user.id))
+        ).map(p => {
+          const up = (p.user_projects || []).find(u => String(u.user_id) === String(user.id));
+          return {
+            projectId: p.id,
+            title: p.title,
+            code: p.code,
+            createdAt: p.created_at,
+            role: up?.project_role || 'asignado',
+          };
+        });
 
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        const mapped = (data || [])
-          .filter(row => row.projects)
-          .map(row => ({
-            projectId: row.projects.project_id,
-            title: row.projects.title,
-            code: row.projects.code,
-            createdAt: row.projects.created_at,
-            role: row.project_role || 'asignado',
-          }));
-
-        if (mounted) setAssignedProjects(mapped);
+        if (mounted) setAssignedProjects(userProjects);
       } catch (err) {
         if (mounted) setNotifError('No se pudieron cargar las notificaciones.');
       } finally {
@@ -173,7 +166,6 @@ export default function Header({ title, subtitle }) {
       </header>
 
       <ThemePanel isOpen={themePanelOpen} onClose={() => setThemePanelOpen(false)} />
-
     </>
   );
 }

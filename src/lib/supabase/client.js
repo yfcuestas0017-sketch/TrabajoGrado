@@ -1,24 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-import { getSupabaseConfig, hasSupabaseConfig } from './config';
-
-let browserClient = null;
-
+// Deprecated: Supabase client has been removed and replaced by PostgreSQL BaseDatosGrado Express API.
 export function getSupabaseClient() {
-  if (browserClient) {
-    return browserClient;
-  }
-
-  const { url, key } = getSupabaseConfig();
-
-  browserClient = createClient(url, key, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-  });
-
-  return browserClient;
+  throw new Error('Supabase client has been removed.');
 }
-
-export const supabase = hasSupabaseConfig ? getSupabaseClient() : null;

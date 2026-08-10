@@ -6,14 +6,9 @@ import {
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/ui/Button';
-import { getSupabaseClient } from '../../lib/supabase/client';
-import EditProjectModal from './EditProjectModal'; // ajusta la ruta
+import EditProjectModal from './EditProjectModal';
 import CrearProyecto from './CrearProyecto';
-import {
-  hasSupabaseConfig,
-  hasSupabaseConfigAttempt,
-  supabaseConfigError,
-} from '../../lib/supabase/config';
+import api from '../../lib/api';
 import { generatePrefix } from './generatePrefix';
 import './ProyectosPage.css';
 
@@ -23,7 +18,6 @@ export function ProyectosPage() {
   const isDocente = user?.role?.toLowerCase() === 'docente';
   const isLimitedUser = isStudent || isDocente;
 
-  // Si el usuario es administrador y tiene un programa asignado, filtrar por ese programa
   const adminProgramId = user?.role?.toLowerCase() === 'administrador' ? (user?.programId ?? null) : null;
 
   const [filters, setFilters] = useState({
@@ -35,7 +29,6 @@ export function ProyectosPage() {
   });
   const [selectedId, setSelectedId] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [ownedProjectIds, setOwnedProjectIds] = useState(new Set());
   const [statuses, setStatuses] = useState([]);
   const [modalities, setModalities] = useState([]);
   const [lines, setLines] = useState([]);
@@ -63,13 +56,13 @@ export function ProyectosPage() {
 
   const [adminProgramName, setAdminProgramName] = useState('');
   const [verifyingCoauthor, setVerifyingCoauthor] = useState(false);
-  
+  const [newCoauthorEmail, setNewCoauthorEmail] = useState('');
   const [editProjectId, setEditProjectId] = useState(null);
 
-  // ── modales ─────────────────────────────────────────────
   const [detailModal, setDetailModal] = useState(null);
   const [historyModal, setHistoryModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
+
   const openEditForm = (project) => {
     setFormData({
       title: project.title || '',
@@ -98,196 +91,101 @@ export function ProyectosPage() {
   };
 
   const fetchHistory = async (projectId) => {
-    if (!projectId || !hasSupabaseConfig) return;
+    if (!projectId) return;
 
     setHistoryLoading(true);
+    try {
+      const data = await api.getProjectHistory(projectId);
+      const mappedHistory = (data ?? []).map((history) => {
+        const title = history.description || 'Actualización registrada';
+        const detail = history.modified_field
+          ? `${history.modified_field}: ${history.old_value ?? '-'} -> ${history.new_value ?? '-'}`
+          : history.change_type || 'Actualización';
+        const date = history.changed_at
+          ? new Date(history.changed_at).toLocaleDateString('es-CO')
+          : 'Sin fecha';
 
-    const supabase = getSupabaseClient();
-    const { data, error: historyError } = await supabase
-      .from('project_histories')
-      .select(
-        'project_history_id, history:histories(description, modified_field, old_value, new_value, change_type, changed_at)',
-      )
-      .eq('project_id', projectId)
-      .order('project_history_id', { ascending: false });
-
-    if (historyError) {
+        return { id: history.history_id, title, detail, date };
+      });
+      setHistoryItems(mappedHistory);
+    } catch (_) {
       setHistoryItems([]);
+    } finally {
       setHistoryLoading(false);
-      return;
     }
-
-    const mappedHistory = (data ?? []).map((row) => {
-      const history = row.history || {};
-      const title = history.description || 'Actualizacion registrada';
-      const detail = history.modified_field
-        ? `${history.modified_field}: ${history.old_value ?? '-'} -> ${history.new_value ?? '-'}`
-        : history.change_type || 'Actualizacion';
-      const date = history.changed_at
-        ? new Date(history.changed_at).toLocaleDateString('es-CO')
-        : 'Sin fecha';
-
-      return {
-        id: row.project_history_id,
-        title,
-        detail,
-        date,
-      };
-    });
-
-    setHistoryItems(mappedHistory);
-    setHistoryLoading(false);
   };
 
   const loadData = useCallback(async () => {
-    if (hasSupabaseConfigAttempt && !hasSupabaseConfig) {
-      setError(supabaseConfigError);
-      setLoading(false);
-      return;
-    }
-
-    if (!hasSupabaseConfig) {
-      setError('Supabase no esta configurado. Completa .env.local para continuar.');
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError('');
 
-    const supabase = getSupabaseClient();
-
-    // ── Obtener IDs de proyectos del usuario actual (siempre) ────
-    let ownedIds = new Set();
-    if (user?.id) {
-      const { data: upRows } = await supabase
-        .from('user_projects')
-        .select('project_id')
-        .eq('user_id', user.id);
-      ownedIds = new Set((upRows ?? []).map((r) => r.project_id));
-      setOwnedProjectIds(ownedIds);
-    }
-
-    // ── Construir query de proyectos ─────────────────────────────
-    let projectsQuery = supabase
-      .from('projects')
-      .select(
-        'project_id, title, code, created_at, letter_link, research_line:research_lines(research_line_id, name), research_subline:research_sublines(research_subline_id, name), status:statuses(status_id, name), modality:modalities(modality_id, name), user_projects(user_id, project_role, users(full_name, email))',
-      )
-      .order('created_at', { ascending: false });
-
-    // Estudiante o Docente: filtrar solo sus proyectos asignados
-    let skipProjects = false;
-    if (isLimitedUser && ownedIds.size > 0) {
-      projectsQuery = projectsQuery.in('project_id', Array.from(ownedIds));
-    } else if (isLimitedUser && ownedIds.size === 0) {
-      skipProjects = true;
-    }
-
-    // Administrador con programa asignado: solo proyectos de usuarios de su programa
-    if (adminProgramId !== null && !isLimitedUser) {
-      const { data: programUserProjects } = await supabase
-        .from('user_projects')
-        .select('project_id, users!inner(program_id)')
-        .eq('users.program_id', adminProgramId);
-      const programProjectIds = [...new Set((programUserProjects || []).map(r => r.project_id))];
-      if (programProjectIds.length > 0) {
-        projectsQuery = projectsQuery.in('project_id', programProjectIds);
-      } else {
-        skipProjects = true;
-      }
-    }
-
-    const [projectsResponse, statusResponse, modalityResponse, linesResponse, sublinesResponse] =
-      await Promise.all([
-        skipProjects ? Promise.resolve({ data: [], error: null }) : projectsQuery,
-        supabase.from('statuses').select('status_id, name').order('name'),
-        supabase.from('modalities').select('modality_id, name').order('name'),
-        supabase.from('research_lines').select('research_line_id, name').order('name'),
-        supabase
-          .from('research_sublines')
-          .select('research_subline_id, name, research_line_id')
-          .order('name'),
+    try {
+      const [allProjects, catalogs] = await Promise.all([
+        api.getProjects(),
+        api.getCatalogs(),
       ]);
 
-    if (projectsResponse.error) {
-      setError('No fue posible cargar los proyectos desde la base de datos.');
-      setProjects([]);
-    } else {
-      const mappedProjects = (projectsResponse.data ?? []).map((row) => {
+      setStatuses(catalogs.statuses || []);
+      setModalities(catalogs.modalities || []);
+      setLines(catalogs.lines || []);
+      setSublines(catalogs.sublines || []);
+
+      let userProjects = allProjects || [];
+
+      if (isLimitedUser && user?.id) {
+        userProjects = userProjects.filter(p =>
+          (p.user_projects || []).some(up => String(up.user_id) === String(user.id))
+        );
+      }
+
+      if (adminProgramId !== null && !isLimitedUser) {
+        userProjects = userProjects.filter(p =>
+          (p.user_projects || []).some(up => String(up.program_id) === String(adminProgramId))
+        );
+      }
+
+      const mappedProjects = userProjects.map((row) => {
         const year = row.created_at
           ? new Date(row.created_at).getFullYear().toString()
           : 'Sin fecha';
-        const authorsArray = (row.user_projects ?? [])
-          .filter(item => item.project_role === 'autor' || item.project_role === 'coautor' || !item.project_role)
-          .map((item) => item.users?.full_name)
-          .filter(Boolean);
-
-        const asesores = (row.user_projects ?? [])
-          .filter(item => item.project_role === 'asesor')
-          .map(item => item.users?.full_name)
-          .filter(Boolean);
-
-        const jurados = (row.user_projects ?? [])
-          .filter(item => item.project_role === 'jurado')
-          .map(item => item.users?.full_name)
-          .filter(Boolean);
-
-        const coauthorsList = (row.user_projects ?? [])
-          .filter(item => item.user_id !== user?.id)
-          .map(item => ({
-            id: item.user_id,
-            name: item.users?.full_name,
-            email: item.users?.email || ''
-          }));
+        const authorsArray = (row.authors || []).map(a => a.name).filter(Boolean);
+        const asesores = (row.advisors || []).map(a => a.name).filter(Boolean);
 
         return {
           id: row.project_id,
           code: row.code || `PR-${row.project_id}`,
           title: row.title,
-          status: row.status?.name || 'Sin estado',
-          statusId: row.status?.status_id || '',
-          modality: row.modality?.name || 'Sin modalidad',
-          modalityId: row.modality?.modality_id || '',
-          line: row.research_line?.name || 'Sin linea',
-          lineId: row.research_line?.research_line_id || '',
-          subline: row.research_subline?.name || 'Sin sublinea',
-          sublineId: row.research_subline?.research_subline_id || '',
+          status: row.status || 'Sin estado',
+          statusId: row.statusId || '',
+          modality: row.modality || 'Sin modalidad',
+          modalityId: row.modalityId || '',
+          line: row.line || 'Sin línea',
+          lineId: row.lineId || '',
+          subline: row.subline || 'Sin sublínea',
+          sublineId: row.sublineId || '',
           year,
           authorsArray: authorsArray.length > 0 ? authorsArray : ['Sin autores'],
           advisor: asesores.length > 0 ? asesores.join(', ') : 'Sin asignar',
-          jurados: jurados.length > 0 ? jurados.join(', ') : 'Sin jurados',
+          jurados: 'Sin jurados',
           updatedAt: row.created_at,
-          description: row.letter_link
-            ? `Carta: ${row.letter_link}`
-            : 'Sin descripcion registrada.',
-          letterLink: row.letter_link || '',
-          isOwned: ownedIds.has(row.project_id),
-          coauthors: coauthorsList,
-          myRole: (row.user_projects ?? []).find(p => p.user_id === user?.id)?.project_role || null,
+          description: row.letterLink
+            ? `Carta: ${row.letterLink}`
+            : 'Sin descripción registrada.',
+          letterLink: row.letterLink || '',
+          isOwned: (row.user_projects || []).some(up => String(up.user_id) === String(user?.id)),
+          coauthors: row.authors || [],
+          myRole: (row.user_projects || []).find(p => String(p.user_id) === String(user?.id))?.project_role || null,
         };
       });
 
       setProjects(mappedProjects);
       setSelectedId(mappedProjects[0]?.id ?? null);
+    } catch (err) {
+      console.error('Error cargando datos:', err);
+      setError('No fue posible cargar los proyectos desde la base de datos.');
+    } finally {
+      setLoading(false);
     }
-
-    setStatuses(statusResponse.error ? [] : statusResponse.data ?? []);
-    setModalities(modalityResponse.error ? [] : modalityResponse.data ?? []);
-    setLines(linesResponse.error ? [] : linesResponse.data ?? []);
-    setSublines(sublinesResponse.error ? [] : sublinesResponse.data ?? []);
-
-    // Si es admin con programa, obtener el nombre del programa para mostrarlo
-    if (adminProgramId !== null) {
-      const { data: progData } = await supabase
-        .from('programs')
-        .select('name')
-        .eq('program_id', adminProgramId)
-        .maybeSingle();
-      if (progData?.name) setAdminProgramName(progData.name);
-    }
-
-    setLoading(false);
   }, [user?.id, user?.role, isLimitedUser, adminProgramId]);
 
   useEffect(() => {
@@ -379,14 +277,9 @@ export function ProyectosPage() {
     setFormError('');
 
     try {
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from('users')
-        .select('user_id, full_name, email')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (error || !data) {
+      const res = await api.checkCoauthor(email);
+      const data = res.user;
+      if (!data) {
         setFormError('Usuario no encontrado. Asegúrate de que el compañero ya se haya registrado en el sistema.');
       } else {
         setFormData(prev => ({
@@ -396,7 +289,7 @@ export function ProyectosPage() {
         setNewCoauthorEmail('');
       }
     } catch (err) {
-      setFormError('Error al verificar el correo.');
+      setFormError('Error al verificar el correo: ' + (err.message || ''));
     } finally {
       setVerifyingCoauthor(false);
     }
@@ -410,9 +303,7 @@ export function ProyectosPage() {
   };
 
   useEffect(() => {
-    // Solo auto-generar en modo creación si hay una línea seleccionada
     if (editProjectId || !formData.lineId) return;
-
     let isMounted = true;
 
     const generateCode = async () => {
@@ -421,27 +312,18 @@ export function ProyectosPage() {
         const line = lines.find((l) => String(l.research_line_id) === String(formData.lineId));
         const prefix = generatePrefix(line?.name);
 
-        const supabase = getSupabaseClient();
-        
-        // Consultar códigos que empiecen con el prefijo
-        const { data } = await supabase
-          .from('projects')
-          .select('code')
-          .ilike('code', `${prefix}-%`);
-
+        const existingProjects = await api.getProjects();
         let maxNum = 0;
-        if (data && data.length > 0) {
-          data.forEach(row => {
-            if (!row.code) return;
-            const parts = row.code.split('-');
-            if (parts.length > 1) {
-              const num = parseInt(parts[1], 10);
-              if (!isNaN(num) && num > maxNum) {
-                maxNum = num;
-              }
+        (existingProjects || []).forEach(row => {
+          if (!row.code) return;
+          const parts = row.code.split('-');
+          if (parts.length > 1) {
+            const num = parseInt(parts[1], 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
             }
-          });
-        }
+          }
+        });
         
         if (isMounted) {
           setFormData(prev => ({ ...prev, code: `${prefix}-${maxNum + 1}` }));
@@ -454,32 +336,14 @@ export function ProyectosPage() {
     };
 
     generateCode();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [formData.lineId, editProjectId, lines]);
 
   const handleSaveProject = async (event) => {
     event.preventDefault();
 
-    if (!hasSupabaseConfig) {
-      setFormError('Supabase no esta configurado.');
-      return;
-    }
-
     if (!formData.title.trim()) {
-      setFormError('El titulo es obligatorio.');
-      return;
-    }
-
-    if (formData.title.trim().length > 255) {
-      setFormError('El título es demasiado largo (máximo 255 caracteres). Si necesitas más, debes cambiar la columna "title" a tipo TEXT en Supabase.');
-      return;
-    }
-
-    if (formData.letterLink.trim() && formData.letterLink.trim().length > 255) {
-      setFormError('El enlace de la carta es demasiado largo (máximo 255 caracteres). Acórtalo o cambia la columna a tipo TEXT en Supabase.');
+      setFormError('El título es obligatorio.');
       return;
     }
 
@@ -491,180 +355,35 @@ export function ProyectosPage() {
     setSubmitting(true);
     setFormError('');
 
-    const supabase = getSupabaseClient();
     const payload = {
       title: formData.title.trim(),
       code: formData.code.trim() || null,
-      status_id: Number(formData.statusId) || null,
-      modality_id: Number(formData.modalityId) || null,
-      research_line_id: formData.lineId ? Number(formData.lineId) : null,
-      research_subline_id: formData.sublineId ? Number(formData.sublineId) : null,
-      letter_link: formData.letterLink.trim() || null,
+      statusId: Number(formData.statusId) || null,
+      modalityId: Number(formData.modalityId) || null,
+      lineId: formData.lineId ? Number(formData.lineId) : null,
+      sublineId: formData.sublineId ? Number(formData.sublineId) : null,
+      letterLink: formData.letterLink.trim() || null,
+      creatorUserId: user?.id,
+      coauthors: formData.coauthors,
     };
 
-    if (editProjectId) {
-      // Usamos select() para confirmar que RLS permitió actualizar la fila
-      const { data: updatedData, error: updateError } = await supabase
-        .from('projects')
-        .update(payload)
-        .eq('project_id', editProjectId)
-        .select('project_id');
-
-      if (updateError || !updatedData || updatedData.length === 0) {
-        console.error('Update Error:', updateError);
-        const errMsg = updateError?.message || 'Bloqueado por RLS (Filas actualizadas: 0)';
-        setFormError(`No fue posible actualizar: ${errMsg}`);
-        setSubmitting(false);
-        return;
-      }
-
-      // Intentar guardar en el historial
-      if (user?.id) {
-        const { data: histData } = await supabase.from('histories').insert({
-          description: 'Proyecto actualizado',
-          change_type: 'Actualizacion',
-          modified_field: 'Varios',
-          // No tenemos un campo 'changed_by' en la estructura que vimos, lo omitimos si da error, pero dejemos lo basico
-        }).select('history_id').single();
-
-        if (histData?.history_id) {
-          await supabase.from('project_histories').insert({
-            project_id: editProjectId,
-            history_id: histData.history_id
-          });
-        }
-      }
-
-      // Edición de co-autores
+    try {
       if (editProjectId) {
-        const { data: currentCoauthors } = await supabase
-          .from('user_projects')
-          .select('user_id')
-          .eq('project_id', editProjectId);
-          
-        const currentIds = (currentCoauthors || []).map(c => c.user_id);
-        const newIds = formData.coauthors.map(c => c.id);
-        
-        // Mantener al usuario actual para no auto-eliminarse por accidente si es el dueño
-        if (user?.id && !newIds.includes(user.id)) {
-           newIds.push(user.id);
-        }
-
-        const idsToAdd = newIds.filter(id => !currentIds.includes(id));
-        const idsToRemove = currentIds.filter(id => !newIds.includes(id));
-
-        const addResults = await Promise.all(
-          idsToAdd.map((id) => {
-            const role = String(id) === String(user?.id) ? 'autor' : 'coautor';
-            return supabase.from('user_projects').insert({
-              project_id: editProjectId,
-              user_id: id,
-              project_role: role,
-            });
-          }),
-        );
-
-        const addErrors = addResults
-          .map((res, idx) => ({ res, id: idsToAdd[idx] }))
-          .filter(({ res }) => res?.error)
-          .map(({ res, id }) => `usuario ${id}: ${res.error.message}`);
-
-        if (addErrors.length > 0) {
-          console.warn('Errores al agregar co-autores en edición:', addErrors);
-          setFormError(
-            `Se actualizó el proyecto, pero no fue posible asignar ${addErrors.length} participante(s): ${addErrors.join(' | ')}`,
-          );
-        }
-
-        if (idsToRemove.length > 0) {
-          const { error: removeError } = await supabase
-            .from('user_projects')
-            .delete()
-            .eq('project_id', editProjectId)
-            .in('user_id', idsToRemove);
-
-          if (removeError) {
-            console.warn('Posible restricción RLS al eliminar co-autor:', removeError.message);
-            setFormError(
-              (prev) => prev
-                ? `${prev} | No se pudieron retirar algunos participantes: ${removeError.message}`
-                : `No se pudieron retirar algunos participantes: ${removeError.message}`,
-            );
-          }
-        }
+        await api.updateProject(editProjectId, payload);
+        setFormSuccess('Proyecto actualizado correctamente.');
+      } else {
+        await api.createProject(payload);
+        setFormSuccess('Proyecto creado correctamente.');
       }
-
-      setFormSuccess('Proyecto actualizado correctamente.');
-    } else {
-      const { data, error: insertError } = await supabase
-        .from('projects')
-        .insert(payload)
-        .select('project_id')
-        .single();
-
-      if (insertError) {
-        console.error('Insert Error:', insertError);
-        setFormError(`No fue posible crear el proyecto: ${insertError.message}`);
-        setSubmitting(false);
-        return;
-      }
-
-      // Vincular el proyecto al usuario actual y co-autores en user_projects
-      if (data?.project_id) {
-        if (user?.id) {
-          const { error: ownerError } = await supabase.from('user_projects').insert({
-            project_id: data.project_id,
-            user_id: user.id,
-            project_role: 'autor',
-          });
-
-          if (ownerError) {
-            console.error('Error al vincular autor principal:', ownerError);
-            setFormError(`El proyecto se creó, pero no se pudo vincular al autor principal: ${ownerError.message}`);
-            setSubmitting(false);
-            return;
-          }
-        }
-
-        if (formData.coauthors.length > 0) {
-          const coauthorResults = await Promise.all(
-            formData.coauthors.map((coauthor) =>
-              supabase.from('user_projects').insert({
-                project_id: data.project_id,
-                user_id: coauthor.id,
-                project_role: 'coautor',
-              }),
-            ),
-          );
-
-          const coauthorErrors = coauthorResults
-            .map((result, idx) => ({ result, coauthor: formData.coauthors[idx] }))
-            .filter(({ result }) => result.error)
-            .map(({ result, coauthor }) => `${coauthor.email}: ${result.error.message}`);
-
-          if (coauthorErrors.length > 0) {
-            console.error('Errores al insertar co-autores:', coauthorErrors);
-            setFormSuccess(
-              `Proyecto creado correctamente. ${coauthorErrors.length} coautor(es) no se pudieron asignar por permisos de base de datos.`,
-            );
-            setSubmitting(false);
-            setTimeout(() => {
-              handleCloseForm();
-              loadData();
-            }, 2200);
-            return;
-          }
-        }
-      }
-
-      setFormSuccess('Proyecto creado correctamente con todos sus autores.');
+      setTimeout(() => {
+        handleCloseForm();
+        loadData();
+      }, 1000);
+    } catch (err) {
+      setFormError(`No fue posible guardar el proyecto: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
-
-    setTimeout(() => {
-      handleCloseForm();
-      loadData();
-    }, 1500);
-    setSubmitting(false);
   };
 
   return (

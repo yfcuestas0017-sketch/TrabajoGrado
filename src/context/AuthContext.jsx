@@ -1,12 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import {
-  hasSupabaseConfig,
-  hasSupabaseConfigAttempt,
-  supabaseConfigError,
-} from '../lib/supabase/config';
-import { getSupabaseClient } from '../lib/supabase/client';
-import { signInWithUsersTable } from '../lib/supabase/usersAuth';
-import { registerStudent } from '../lib/supabase/registerUser';
+import api from '../lib/api';
 
 const AuthContext = createContext(null);
 const LOCAL_STORAGE_KEY = 'gradohub_user';
@@ -34,14 +27,15 @@ function normalizeUser(storedUser) {
   if (!email) return null;
 
   return {
-    id: storedUser.id ?? null,   // UUID (Supabase Auth) o null en modo local
+    id: storedUser.id ?? null,
     name: storedUser.name || formatNameFromEmail(email),
     email,
     role: storedUser.role || 'usuario',
     faculty: storedUser.faculty ?? null,
     programId: storedUser.programId ?? null,
+    programName: storedUser.programName ?? null,
     avatar: storedUser.avatar ?? null,
-    authMode: storedUser.authMode || 'local',
+    authMode: storedUser.authMode || 'postgres',
   };
 }
 
@@ -53,33 +47,17 @@ export function AuthProvider({ children }) {
     let mounted = true;
 
     const restoreSession = () => {
-      if (hasSupabaseConfigAttempt && !hasSupabaseConfig) {
-        if (mounted) {
-          setUser(null);
-          setLoading(false);
-        }
-
-        return;
-      }
-
       try {
         const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
 
         if (!stored) {
-          if (mounted) {
-            setUser(null);
-          }
-
+          if (mounted) setUser(null);
           return;
         }
 
         const restoredUser = normalizeUser(JSON.parse(stored));
-
-        if (restoredUser) {
-          if (mounted) {
-            setUser(restoredUser);
-          }
-
+        if (restoredUser && mounted) {
+          setUser(restoredUser);
           return;
         }
 
@@ -87,9 +65,7 @@ export function AuthProvider({ children }) {
       } catch {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     };
 
@@ -105,68 +81,33 @@ export function AuthProvider({ children }) {
     const normalizedPassword = password.trim();
 
     if (!normalizedEmail || !normalizedPassword) {
-      throw new Error('Ingresa correo y contrasena.');
+      throw new Error('Ingresa correo y contraseña.');
     }
 
-    if (hasSupabaseConfigAttempt && !hasSupabaseConfig) {
-      throw new Error(supabaseConfigError);
-    }
+    const response = await api.login(normalizedEmail, normalizedPassword);
+    const databaseUser = normalizeUser(response.user);
 
-    if (hasSupabaseConfig) {
-      const databaseUser = normalizeUser(
-        await signInWithUsersTable(normalizedEmail, normalizedPassword),
-      );
-
-      setUser(databaseUser);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(databaseUser));
-      return databaseUser;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    const safeUser = normalizeUser({
-      email: normalizedEmail,
-      name: formatNameFromEmail(normalizedEmail),
-      role: 'usuario',
-      authMode: 'local',
-    });
-
-    setUser(safeUser);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(safeUser));
-    return safeUser;
+    setUser(databaseUser);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(databaseUser));
+    return databaseUser;
   };
 
   const register = async (fields) => {
-    if (hasSupabaseConfigAttempt && !hasSupabaseConfig) {
-      throw new Error(supabaseConfigError);
-    }
-
-    if (!hasSupabaseConfig) {
-      throw new Error(
-        'Para registrarse se necesita la conexión con Supabase. Completa .env.local.',
-      );
-    }
-
-    const newUser = normalizeUser(await registerStudent(fields));
+    const response = await api.register(fields);
+    const newUser = normalizeUser(response.user);
     setUser(newUser);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newUser));
     return newUser;
   };
 
   const logout = async () => {
-    // Cerrar sesión en Supabase Auth (invalida el JWT)
-    if (hasSupabaseConfig) {
-      try { await getSupabaseClient().auth.signOut(); } catch (_) { /* ignorar */ }
-    }
     setUser(null);
     localStorage.removeItem(LOCAL_STORAGE_KEY);
   };
 
   const updateUser = (updates) => {
     if (!user) return;
-
     const updatedUser = normalizeUser({ ...user, ...updates });
-
     if (!updatedUser) return;
 
     setUser(updatedUser);
@@ -182,10 +123,9 @@ export function AuthProvider({ children }) {
         register,
         logout,
         updateUser,
-        authProvider: hasSupabaseConfig ? 'supabase-users-table' : 'local',
-        isSupabaseEnabled: hasSupabaseConfig,
-        configurationIssue:
-          hasSupabaseConfigAttempt && !hasSupabaseConfig ? supabaseConfigError : '',
+        authProvider: 'postgres-base-datos-grado',
+        isSupabaseEnabled: false,
+        configurationIssue: '',
       }}
     >
       {children}

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getSupabaseClient } from '../lib/supabase/client';
-import { hasSupabaseConfig } from '../lib/supabase/config';
+import api from '../lib/api';
 
 export function useAnalytics(adminProgramId = null) {
   const [data, setData] = useState(null);
@@ -8,71 +7,29 @@ export function useAnalytics(adminProgramId = null) {
   const [error, setError] = useState('');
 
   const fetchData = useCallback(async () => {
-    if (!hasSupabaseConfig) {
-      setLoading(false);
-      setData({ projects: [], totalProjects: 0, statuses: [], lines: [], sublines: [], programs: [], faculties: [], numStudents: 0, numLines: 0, projectsByStatus: {}, projectsByLine: {}, projectsBySubline: {}, projectsByProgram: {}, projectsByYearSemester: [], topLine: null, topProgram: null, topStatus: null, topAdvisor: [], topSublines: [], lineSublineMatrix: {}, recentProjects: [] });
-      return;
-    }
-
     setLoading(true);
     setError('');
 
     try {
-      let supabase;
-      try {
-        supabase = getSupabaseClient();
-      } catch (clientErr) {
-        setError('Supabase no configurado correctamente.');
-        setLoading(false);
-        return;
-      }
+      const res = await api.getAnalytics(adminProgramId);
 
-      const [
-        projectsRes,
-        statusesRes,
-        linesRes,
-        sublinesRes,
-        programsRes,
-        facultiesRes,
-        userProjectsRes,
-        studentsRes,
-      ] = await Promise.all([
-        supabase
-          .from('projects')
-          .select('project_id, title, code, created_at, status_id, research_line_id, research_subline_id, modality_id, user_projects(user_id, project_role, users(full_name, email, program_id, programs(name)))')
-          .order('created_at', { ascending: false }),
-        supabase.from('statuses').select('status_id, name').order('name'),
-        supabase.from('research_lines').select('research_line_id, name').order('name'),
-        supabase.from('research_sublines').select('research_subline_id, name, research_line_id').order('name'),
-        supabase.from('programs').select('program_id, name, faculty_id').order('name'),
-        supabase.from('faculties').select('faculty_id, name').order('name'),
-        supabase.from('user_projects').select('user_project_id, user_id, project_id, project_role, users(full_name, email, program_id, programs(name))'),
-        supabase.from('students').select('student_id, user_id'),
-      ]);
-
-      if (projectsRes.error) {
-        setError('Error cargando proyectos.');
-        setLoading(false);
-        return;
-      }
-
-      let projects = projectsRes.data || [];
-      const statuses = statusesRes.data || [];
-      const lines = linesRes.data || [];
-      const sublines = sublinesRes.data || [];
-      const programs = programsRes.data || [];
-      const faculties = facultiesRes.data || [];
-      const userProjects = userProjectsRes.data || [];
-      const students = studentsRes.data || [];
+      let projects = res.projects || [];
+      const statuses = res.statuses || [];
+      const lines = res.lines || [];
+      const sublines = res.sublines || [];
+      const programs = res.programs || [];
+      const faculties = res.faculties || [];
+      const userProjects = res.userProjects || [];
+      const students = res.students || [];
 
       if (adminProgramId !== null) {
         const programUserIds = new Set(
           userProjects
-            .filter(up => String(up.users?.program_id) === String(adminProgramId))
+            .filter(up => String(up.program_id) === String(adminProgramId))
             .map(up => up.user_id)
         );
         projects = projects.filter(p =>
-          (p.user_projects || []).some(up => programUserIds.has(up.user_id))
+          userProjects.some(up => up.project_id === p.project_id && programUserIds.has(up.user_id))
         );
       }
 
@@ -92,11 +49,12 @@ export function useAnalytics(adminProgramId = null) {
       faculties.forEach(f => { facultyMap[f.faculty_id] = f.name; });
 
       const enrichedProjects = projects.map(p => {
-        const authors = (p.user_projects || []).filter(up =>
+        const pUserProjects = userProjects.filter(up => up.project_id === p.project_id);
+        const authors = pUserProjects.filter(up =>
           up.project_role === 'autor' || up.project_role === 'coautor' || !up.project_role
         );
-        const advisors = (p.user_projects || []).filter(up => up.project_role === 'asesor');
-        const programId = authors[0]?.users?.program_id || null;
+        const advisors = pUserProjects.filter(up => up.project_role === 'asesor');
+        const programId = authors[0]?.program_id || null;
         const facultyId = programs.find(pr => pr.program_id === programId)?.faculty_id || null;
 
         return {
@@ -117,8 +75,8 @@ export function useAnalytics(adminProgramId = null) {
           createdAt: p.created_at,
           year: p.created_at ? new Date(p.created_at).getFullYear() : null,
           semester: p.created_at ? getSemester(p.created_at) : null,
-          authors: authors.map(a => a.users?.full_name).filter(Boolean),
-          advisors: advisors.map(a => a.users?.full_name).filter(Boolean),
+          authors: authors.map(a => a.full_name).filter(Boolean),
+          advisors: advisors.map(a => a.full_name).filter(Boolean),
         };
       });
 
@@ -156,11 +114,11 @@ export function useAnalytics(adminProgramId = null) {
 
       const advisorProjectCount = {};
       userProjects.forEach(up => {
-        if (up.project_role === 'asesor' && up.users?.full_name) {
-          const name = up.users.full_name;
+        if (up.project_role === 'asesor' && up.full_name) {
+          const name = up.full_name;
           let belongsToProgram = true;
           if (adminProgramId !== null) {
-            belongsToProgram = String(up.users?.program_id) === String(adminProgramId);
+            belongsToProgram = String(up.program_id) === String(adminProgramId);
           }
           if (belongsToProgram) {
             advisorProjectCount[name] = (advisorProjectCount[name] || 0) + 1;
@@ -222,6 +180,7 @@ export function useAnalytics(adminProgramId = null) {
         recentProjects: enrichedProjects.slice(0, 5),
       });
     } catch (err) {
+      console.error('Error in useAnalytics:', err);
       setError('Error cargando datos analíticos.');
     } finally {
       setLoading(false);

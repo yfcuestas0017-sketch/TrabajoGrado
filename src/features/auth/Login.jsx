@@ -1,28 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff, GraduationCap, UserPlus, LogIn, ChevronDown } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, UserPlus, LogIn } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/ui/Button';
-import { fetchPrograms, fetchSemesters, fetchActiveCurricula } from '../../lib/supabase/registerUser';
 import './Login.css';
 
 /* ─── mode toggle ─────────────────────────────────────────── */
 const MODES = { login: 'login', register: 'register' };
 
-/* ─── datos de respaldo ───────────────────────────────────── */
-const FALLBACK_PROGRAMS = [
-  { program_id: 1, name: 'Ingeniería de Sistemas' },
-  { program_id: 2, name: 'Psicología' },
-];
-
-const FALLBACK_SEMESTERS = [
-  { semester_id: 8, semester_number: 8 },
-  { semester_id: 9, semester_number: 9 },
-  { semester_id: 10, semester_number: 10 },
-];
-
 export default function Login() {
-  const { user, login, register, isSupabaseEnabled, configurationIssue } = useAuth();
+  const { user, login, register } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState(MODES.login);
@@ -90,7 +77,7 @@ export default function Login() {
             <div className="login-note">
               <span className="login-note-pill">UCESMAG</span>
               <p className="login-note-text">
-                La información se conecta directamente con Supabase y la base de datos institucional.
+                La información se conecta directamente con la base de datos institucional BaseDatosGrado.
               </p>
             </div>
           </div>
@@ -134,12 +121,6 @@ export default function Login() {
             </div>
 
             {/* ALERTS */}
-            {configurationIssue && (
-              <div className="login-warning">
-                <AlertCircle size={16} />
-                <span>{configurationIssue}</span>
-              </div>
-            )}
             {error && (
               <div className="login-error">
                 <AlertCircle size={16} />
@@ -241,8 +222,6 @@ export default function Login() {
                   </div>
                 </div>
 
-
-
                 {/* Nota: rol asignado automáticamente */}
                 <div className="reg-role-note">
                   <span className="reg-role-pill">Rol: Estudiante</span>
@@ -264,7 +243,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-
     </>
   );
 }
