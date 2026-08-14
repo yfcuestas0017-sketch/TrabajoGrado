@@ -24,7 +24,11 @@
     "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "@vitejs/plugin-react": "^6.0.5",
+=======
+    "@vitejs/plugin-react": "^4.2.1",
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
     "vite": "^8.2.1"
   },
   "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",

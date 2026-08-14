@@ -298,7 +298,10 @@ app.get('/api/projects', async (req, res) => {
       const participants = userProjectsByProject[p.project_id] || [];
       const authors = participants.filter(up => up.project_role === 'autor' || up.project_role === 'coautor');
       const advisors = participants.filter(up => up.project_role === 'asesor');
+<<<<<<< HEAD
       const jurors = participants.filter(up => up.project_role === 'jurado');
+=======
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
 
       return {
         id: p.project_id,
@@ -319,7 +322,10 @@ app.get('/api/projects', async (req, res) => {
         user_projects: participants,
         authors: authors.map(a => ({ id: String(a.user_id), name: a.full_name, email: a.email, role: a.project_role, program: a.program_name })),
         advisors: advisors.map(a => ({ id: String(a.user_id), name: a.full_name, email: a.email, program: a.program_name })),
+<<<<<<< HEAD
         jurors: jurors.map(a => ({ id: String(a.user_id), name: a.full_name, email: a.email, program: a.program_name })),
+=======
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
       };
     });
 
@@ -477,6 +483,7 @@ app.put('/api/projects/:id', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // Update Project Team (authors, coauthors, advisors, jury) — Admin only feature on the frontend
 app.put('/api/projects/:id/participants', async (req, res) => {
   const projectId = parseInt(req.params.id, 10);
@@ -552,6 +559,8 @@ app.put('/api/projects/:id/participants', async (req, res) => {
   }
 });
 
+=======
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
 // Delete Project
 app.delete('/api/projects/:id', async (req, res) => {
   const projectId = parseInt(req.params.id, 10);

@@ -150,7 +150,10 @@ export function ProyectosPage() {
           : 'Sin fecha';
         const authorsArray = (row.authors || []).map(a => a.name).filter(Boolean);
         const asesores = (row.advisors || []).map(a => a.name).filter(Boolean);
+<<<<<<< HEAD
         const juradosArray = (row.jurors || []).map(a => a.name).filter(Boolean);
+=======
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
 
         return {
           id: row.project_id,
@@ -167,7 +170,11 @@ export function ProyectosPage() {
           year,
           authorsArray: authorsArray.length > 0 ? authorsArray : ['Sin autores'],
           advisor: asesores.length > 0 ? asesores.join(', ') : 'Sin asignar',
+<<<<<<< HEAD
           jurados: juradosArray.length > 0 ? juradosArray.join(', ') : 'Sin jurados',
+=======
+          jurados: 'Sin jurados',
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
           updatedAt: row.created_at,
           description: row.letterLink
             ? `Carta: ${row.letterLink}`
@@ -175,9 +182,12 @@ export function ProyectosPage() {
           letterLink: row.letterLink || '',
           isOwned: (row.user_projects || []).some(up => String(up.user_id) === String(user?.id)),
           coauthors: row.authors || [],
+<<<<<<< HEAD
           authorsList: row.authors || [],
           advisorsList: row.advisors || [],
           jurorsList: row.jurors || [],
+=======
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
           myRole: (row.user_projects || []).find(p => String(p.user_id) === String(user?.id))?.project_role || null,
         };
       });

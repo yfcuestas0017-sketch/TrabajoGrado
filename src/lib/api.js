@@ -53,11 +53,14 @@ export const api = {
     body: JSON.stringify(projectData),
   }),
 
+<<<<<<< HEAD
   updateProjectParticipants: (id, participants) => request(`/projects/${id}/participants`, {
     method: 'PUT',
     body: JSON.stringify({ participants }),
   }),
 
+=======
+>>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
   deleteProject: (id) => request(`/projects/${id}`, {
     method: 'DELETE',
   }),
