@@ -1,0 +1,22 @@
+        .card {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: var(--border-radius-lg);
+          box-shadow: var(--shadow-sm);
+          transition: all var(--transition-base);
+        }
+        .card--hover:hover {
+          box-shadow: var(--shadow-md);
+          border-color: color-mix(in srgb, var(--accent-primary) 30%, var(--border-color));
+          transform: translateY(-2px);
+        }
+        .card--clickable { cursor: pointer; }
+
+        @media (max-width: 640px) {
+          .card {
+            border-radius: var(--border-radius-md);
+          }
+        }
+      
+
+        
