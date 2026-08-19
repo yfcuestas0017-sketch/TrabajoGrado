@@ -33,6 +33,7 @@ export function ProyectosPage() {
   const [modalities, setModalities] = useState([]);
   const [lines, setLines] = useState([]);
   const [sublines, setSublines] = useState([]);
+  const [academicSemesters, setAcademicSemesters] = useState([]);
   const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -62,6 +63,13 @@ export function ProyectosPage() {
   const [detailModal, setDetailModal] = useState(null);
   const [historyModal, setHistoryModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
+  const [studentProcess, setStudentProcess] = useState(null);
+  const [studentProcessLoading, setStudentProcessLoading] = useState(false);
+  const [studentRecords, setStudentRecords] = useState({ progress: [], documents: [] });
+  const [studentAction, setStudentAction] = useState('');
+  const [studentActionData, setStudentActionData] = useState({ description: '', fileUrl: '', observations: '' });
+  const [studentActionError, setStudentActionError] = useState('');
+  const [studentActionSaving, setStudentActionSaving] = useState(false);
 
   const openEditForm = (project) => {
     setFormData({
@@ -120,15 +128,32 @@ export function ProyectosPage() {
     setError('');
 
     try {
-      const [allProjects, catalogs] = await Promise.all([
+      const requests = [
         api.getProjects(),
         api.getCatalogs(),
-      ]);
+      ];
+      if (isStudent && user?.id) requests.push(api.getStudentResearchProcess(user.id));
+      const [allProjects, catalogs, academicProcess] = await Promise.all(requests);
+
+      if (isStudent) {
+        setStudentProcess(academicProcess || null);
+        setStudentProcessLoading(false);
+        if (academicProcess?.project?.id && user?.id) {
+          const [progress, documents] = await Promise.all([
+            api.getResearchProgress(academicProcess.project.id, user.id),
+            api.getResearchDocuments(academicProcess.project.id, user.id),
+          ]);
+          setStudentRecords({ progress: progress || [], documents: documents || [] });
+        } else {
+          setStudentRecords({ progress: [], documents: [] });
+        }
+      }
 
       setStatuses(catalogs.statuses || []);
       setModalities(catalogs.modalities || []);
       setLines(catalogs.lines || []);
       setSublines(catalogs.sublines || []);
+      setAcademicSemesters(catalogs.semesters || []);
 
       let userProjects = allProjects || [];
 
@@ -150,10 +175,7 @@ export function ProyectosPage() {
           : 'Sin fecha';
         const authorsArray = (row.authors || []).map(a => a.name).filter(Boolean);
         const asesores = (row.advisors || []).map(a => a.name).filter(Boolean);
-<<<<<<< HEAD
         const juradosArray = (row.jurors || []).map(a => a.name).filter(Boolean);
-=======
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
 
         return {
           id: row.project_id,
@@ -170,11 +192,7 @@ export function ProyectosPage() {
           year,
           authorsArray: authorsArray.length > 0 ? authorsArray : ['Sin autores'],
           advisor: asesores.length > 0 ? asesores.join(', ') : 'Sin asignar',
-<<<<<<< HEAD
           jurados: juradosArray.length > 0 ? juradosArray.join(', ') : 'Sin jurados',
-=======
-          jurados: 'Sin jurados',
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
           updatedAt: row.created_at,
           description: row.letterLink
             ? `Carta: ${row.letterLink}`
@@ -182,12 +200,9 @@ export function ProyectosPage() {
           letterLink: row.letterLink || '',
           isOwned: (row.user_projects || []).some(up => String(up.user_id) === String(user?.id)),
           coauthors: row.authors || [],
-<<<<<<< HEAD
           authorsList: row.authors || [],
           advisorsList: row.advisors || [],
           jurorsList: row.jurors || [],
-=======
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
           myRole: (row.user_projects || []).find(p => String(p.user_id) === String(user?.id))?.project_role || null,
         };
       });
@@ -196,11 +211,21 @@ export function ProyectosPage() {
       setSelectedId(mappedProjects[0]?.id ?? null);
     } catch (err) {
       console.error('Error cargando datos:', err);
+      if (isStudent) setStudentProcessLoading(false);
       setError('No fue posible cargar los proyectos desde la base de datos.');
     } finally {
       setLoading(false);
     }
   }, [user?.id, user?.role, isLimitedUser, adminProgramId]);
+
+  useEffect(() => {
+    if (!isStudent) {
+      setStudentProcess(null);
+      setStudentProcessLoading(false);
+    } else {
+      setStudentProcessLoading(true);
+    }
+  }, [isStudent, user?.id]);
 
   useEffect(() => {
     loadData();
@@ -255,6 +280,98 @@ export function ProyectosPage() {
     estados: statuses.length,
     modalidades: modalities.length,
   }), [projects.length, statuses.length, modalities.length]);
+
+  const studentCanCreate = isStudent && studentProcess?.canCreate === true;
+  const studentPhase = studentProcess?.phase;
+  const studentSemester = studentProcess?.semesterNumber;
+  const studentStageTitle = studentPhase === 'I'
+    ? 'Investigación I'
+    : studentPhase === 'II'
+      ? 'Investigación II'
+      : studentPhase === 'III'
+        ? 'Investigación III'
+        : 'Proceso de investigación';
+  const studentStageDescription = studentPhase === 'I'
+    ? 'Propuesta de investigación'
+    : studentPhase === 'II'
+      ? 'Continuación del proyecto de investigación'
+      : studentPhase === 'III'
+        ? 'Finalización del proyecto de investigación'
+        : 'Consulta tu proceso académico';
+  const studentProcessMessage = studentProcess?.project
+    ? 'Ya tienes un proyecto de investigación registrado.'
+    : studentPhase === 'I'
+      ? 'Aún no tienes un proyecto de investigación registrado.'
+      : studentPhase === 'II'
+        ? 'No tienes un proyecto de Investigación I registrado. Debes tener una propuesta previa para continuar con Investigación II.'
+        : studentPhase === 'III'
+          ? 'No tienes un proyecto de investigación asociado. No es posible iniciar un nuevo proyecto desde Investigación III.'
+          : 'No encontramos el semestre académico de tu perfil.';
+
+  const processStepState = (step) => {
+    if (!studentPhase) return 'pending';
+    const current = { I: 1, II: 2, III: 3 }[studentPhase] || 0;
+    if (step < current) return 'complete';
+    if (step === current) return 'current';
+    return 'pending';
+  };
+
+  const openStudentAction = (action) => {
+    setStudentAction(action);
+    setStudentActionError('');
+    setStudentActionData({ description: '', fileUrl: '', observations: '' });
+  };
+
+  const submitStudentAction = async (event) => {
+    event.preventDefault();
+    if (!studentProcess?.project?.id || !user?.id) return;
+    setStudentActionSaving(true);
+    setStudentActionError('');
+    try {
+      if (studentAction === 'progress') {
+        if (!studentActionData.description.trim()) throw new Error('Describe el avance antes de guardarlo.');
+        await api.createResearchProgress(studentProcess.project.id, user.id, studentActionData.description);
+      } else {
+        if (!studentActionData.fileUrl.trim()) throw new Error('Ingresa el enlace del documento.');
+        await api.createResearchDocument(studentProcess.project.id, {
+          userId: user.id,
+          documentType: studentAction,
+          fileUrl: studentActionData.fileUrl,
+          observations: studentActionData.observations,
+        });
+      }
+      const [progress, documents] = await Promise.all([
+        api.getResearchProgress(studentProcess.project.id, user.id),
+        api.getResearchDocuments(studentProcess.project.id, user.id),
+      ]);
+      setStudentRecords({ progress: progress || [], documents: documents || [] });
+      setStudentAction('');
+      setStudentActionData({ description: '', fileUrl: '', observations: '' });
+    } catch (err) {
+      setStudentActionError(err.message || 'No fue posible registrar la información.');
+    } finally {
+      setStudentActionSaving(false);
+    }
+  };
+
+  const completeAcademicProfile = async () => {
+    if (!user?.id || !studentActionData.semesterId) {
+      setStudentActionError('Selecciona tu semestre académico.');
+      return;
+    }
+    setStudentActionSaving(true);
+    setStudentActionError('');
+    try {
+      await api.updateStudentAcademicProfile(user.id, studentActionData.semesterId);
+      setStudentAction('');
+      setStudentActionData({ description: '', fileUrl: '', observations: '', semesterId: '' });
+      await loadData();
+    } catch (err) {
+      setStudentActionError(err.message || 'No fue posible guardar el semestre académico.');
+    } finally {
+      setStudentActionSaving(false);
+    }
+  };
 
   const handleFilterChange = (key) => (event) => {
     setFilters((prev) => ({ ...prev, [key]: event.target.value }));
@@ -419,13 +536,16 @@ export function ProyectosPage() {
                 )}
             </div>
             <div className="projects-actions">
-              {!isDocente && (
+              {(!isStudent || studentCanCreate) && !isDocente && (
                 <Button
                   variant="primary"
                   icon={FilePlus2}
-                  onClick={() => setShowCrearModal(true)}
+                  onClick={() => {
+                    if (isStudent && !studentCanCreate) return;
+                    setShowCrearModal(true);
+                  }}
                 >
-                  Agregar proyecto
+                  {isStudent ? 'Registrar propuesta de investigación' : 'Agregar proyecto'}
                 </Button>
               )}
             </div>
@@ -451,6 +571,70 @@ export function ProyectosPage() {
           <div className="page-error">
             <span>{error}</span>
           </div>
+        )}
+
+        {isStudent && (
+          <section className="student-research-process" aria-label="Mi proceso de investigación">
+            <div className="student-process-heading">
+              <div>
+                <span className="section-eyebrow">Mi proceso de investigación</span>
+                <h2 className="section-title">{studentStageTitle}</h2>
+                <p className="section-subtitle">Semestre actual: {studentSemester ? `${studentSemester}°` : 'No registrado'} · {studentStageDescription}</p>
+              </div>
+              {studentProcessLoading && <span className="student-process-status">Consultando semestre...</span>}
+            </div>
+
+            <div className="student-process-steps">
+              {[
+                { number: 1, label: 'Investigación I', detail: 'Propuesta' },
+                { number: 2, label: 'Investigación II', detail: 'Avances' },
+                { number: 3, label: 'Investigación III', detail: 'Producto final' },
+              ].map((step, index) => (
+                <div className="student-process-step-wrap" key={step.number}>
+                  <div className={`student-process-step student-process-step--${processStepState(step.number)}`}>
+                    <span className="student-process-step-mark">{processStepState(step.number) === 'complete' ? '✓' : processStepState(step.number) === 'current' ? '●' : '○'}</span>
+                    <span><strong>{step.label}</strong><small>{step.detail}</small></span>
+                  </div>
+                  {index < 2 && <span className="student-process-arrow">→</span>}
+                </div>
+              ))}
+            </div>
+
+            <div className="student-process-content">
+              <p>{studentProcessMessage}</p>
+              {studentProcess?.reason === 'semester_missing' && <div className="student-process-form">
+                <strong>Completa tu semestre académico</strong>
+                <select value={studentActionData.semesterId || ''} onChange={(event) => setStudentActionData((current) => ({ ...current, semesterId: event.target.value }))}>
+                  <option value="">Selecciona tu semestre</option>
+                  {academicSemesters.map((semester) => <option key={semester.semester_id} value={semester.semester_id}>{semester.semester_number}° semestre</option>)}
+                </select>
+                {studentActionError && <span className="student-process-error">{studentActionError}</span>}
+                <div className="student-process-form-actions"><button type="button" onClick={() => setStudentActionError('')}>Cancelar</button><button type="button" onClick={completeAcademicProfile} disabled={studentActionSaving}>{studentActionSaving ? 'Guardando...' : 'Guardar semestre'}</button></div>
+              </div>}
+              {studentProcess?.project && (
+                <div className="student-process-project">
+                  <strong>{studentProcess.project.title}</strong>
+                  <span>{studentProcess.project.code || 'Sin código'} · {studentProcess.project.status || 'Sin estado'}</span>
+                  <span>Línea: {studentProcess.project.line || 'No registrada'}</span>
+                  <span>Integrantes: {studentProcess.project.participants?.map((person) => person.name).join(', ') || 'No registrados'}</span>
+                  <div className="student-process-actions">
+                    {studentPhase !== 'I' && <button type="button" onClick={() => openStudentAction('progress')}>Registrar avance</button>}
+                    {studentPhase === 'II' && <button type="button" onClick={() => openStudentAction('avance_documento')}>Subir documento</button>}
+                    {studentPhase === 'III' && <button type="button" onClick={() => openStudentAction('producto_final')}>Subir producto final</button>}
+                    {studentPhase === 'III' && <button type="button" onClick={() => openStudentAction('documento_final')}>Subir documento final</button>}
+                  </div>
+                </div>
+              )}
+              {studentRecords.progress.length > 0 && <div className="student-process-records"><strong>Avances registrados</strong>{studentRecords.progress.map((item) => <span key={item.progress_id}>{new Date(item.created_at).toLocaleDateString('es-CO')}: {item.description}</span>)}</div>}
+              {studentRecords.documents.length > 0 && <div className="student-process-records"><strong>Documentos registrados</strong>{studentRecords.documents.map((item) => <a key={item.document_id} href={item.file_url} target="_blank" rel="noreferrer">{item.document_type} · {new Date(item.delivered_at).toLocaleDateString('es-CO')}</a>)}</div>}
+              {studentAction && <form className="student-process-form" onSubmit={submitStudentAction}>
+                <strong>{studentAction === 'progress' ? 'Registrar avance' : 'Registrar documento'}</strong>
+                {studentAction === 'progress' ? <textarea value={studentActionData.description} onChange={(event) => setStudentActionData((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el avance realizado..." rows="3" required /> : <><input type="url" value={studentActionData.fileUrl} onChange={(event) => setStudentActionData((current) => ({ ...current, fileUrl: event.target.value }))} placeholder="Enlace al documento o evidencia" required /><textarea value={studentActionData.observations} onChange={(event) => setStudentActionData((current) => ({ ...current, observations: event.target.value }))} placeholder="Observaciones (opcional)" rows="2" /></>}
+                {studentActionError && <span className="student-process-error">{studentActionError}</span>}
+                <div className="student-process-form-actions"><button type="button" onClick={() => setStudentAction('')}>Cancelar</button><button type="submit" disabled={studentActionSaving}>{studentActionSaving ? 'Guardando...' : 'Guardar'}</button></div>
+              </form>}
+            </div>
+          </section>
         )}
 
         {showForm && (

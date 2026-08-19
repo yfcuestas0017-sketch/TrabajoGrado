@@ -751,6 +751,56 @@
           to   { opacity: 1; transform: translateY(0)   scale(1); }
         }
 
+        .student-research-process {
+          display: grid;
+          gap: 18px;
+          padding: 22px 24px;
+          border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, var(--border-color));
+          border-radius: var(--border-radius-xl);
+          background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 8%, transparent), transparent 60%), var(--bg-card);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .student-process-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+        .student-process-status { color: var(--text-muted); font-size: .78rem; }
+        .student-process-steps { display: flex; align-items: center; gap: 10px; }
+        .student-process-step-wrap { display: flex; align-items: center; gap: 10px; flex: 1; }
+        .student-process-step { display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--text-muted); }
+        .student-process-step-mark { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border-color); border-radius: 50%; font-size: .85rem; flex: 0 0 30px; }
+        .student-process-step strong, .student-process-step small { display: block; }
+        .student-process-step strong { font-size: .82rem; color: var(--text-secondary); }
+        .student-process-step small { margin-top: 2px; font-size: .72rem; }
+        .student-process-step--current .student-process-step-mark { color: #fff; border-color: var(--accent-primary); background: var(--accent-primary); }
+        .student-process-step--current strong { color: var(--accent-primary); }
+        .student-process-step--complete .student-process-step-mark { color: var(--accent-success); border-color: var(--accent-success); }
+        .student-process-step--complete strong { color: var(--text-primary); }
+        .student-process-arrow { color: var(--text-muted); font-size: 1.15rem; }
+        .student-process-content { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: .86rem; }
+        .student-process-content p { margin: 0; }
+        .student-process-project { display: grid; gap: 3px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); background: var(--bg-primary); }
+        .student-process-project strong { color: var(--text-primary); font-size: .96rem; }
+        .student-process-project span { color: var(--text-secondary); font-size: .8rem; }
+        .student-process-note { color: var(--text-muted); font-size: .78rem; }
+        .student-process-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .student-process-actions button, .student-process-form-actions button { padding: 7px 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--accent-primary); background: var(--bg-card); font-size: .76rem; font-weight: 600; cursor: pointer; }
+        .student-process-actions button:hover, .student-process-form-actions button[type="submit"] { color: #fff; border-color: var(--accent-primary); background: var(--accent-primary); }
+        .student-process-records { display: grid; gap: 5px; padding: 10px 12px; border-left: 3px solid var(--accent-primary); background: var(--bg-primary); font-size: .78rem; }
+        .student-process-records strong { color: var(--text-primary); }
+        .student-process-records span, .student-process-records a { color: var(--text-secondary); }
+        .student-process-records a { text-decoration: underline; }
+        .student-process-form { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); background: var(--bg-card); }
+        .student-process-form input, .student-process-form textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary); background: var(--bg-secondary); resize: vertical; }
+        .student-process-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .student-process-error { color: var(--accent-danger); font-size: .78rem; }
+
+        @media (max-width: 720px) {
+          .student-research-process { padding: 18px 16px; }
+          .student-process-heading { flex-direction: column; }
+          .student-process-steps { align-items: flex-start; flex-direction: column; gap: 7px; }
+          .student-process-step-wrap { width: 100%; }
+          .student-process-arrow { display: none; }
+        }
+
         @media print {
           body * {
             visibility: hidden;

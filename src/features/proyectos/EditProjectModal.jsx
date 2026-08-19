@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-<<<<<<< HEAD
 import { X, ChevronDown, Save, Loader2, Plus, Trash2, Users } from 'lucide-react';
 import api from '../../lib/api';
 import './EditProjectModal.css';
@@ -31,13 +30,6 @@ function Avatar({ name, size = 30 }) {
 export default function EditProjectModal({ project, statuses, modalities, lines, sublines, user, onClose, onSaved }) {
   const isAdmin = user?.role?.toLowerCase() === 'administrador';
 
-=======
-import { X, ChevronDown, Save, Loader2 } from 'lucide-react';
-import api from '../../lib/api';
-import './EditProjectModal.css';
-
-export default function EditProjectModal({ project, statuses, modalities, lines, sublines, onClose, onSaved }) {
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
   const [form, setForm] = useState({
     title: project.title || '',
     code: project.code || '',
@@ -54,7 +46,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-<<<<<<< HEAD
   // ── Equipo del proyecto (solo admin) ──────────────────────────────────
   const initialTeam = [
     ...(project.authorsList || []).map(p => ({ id: p.id, name: p.name, email: p.email, role: p.role || 'autor' })),
@@ -67,8 +58,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
   const [verifying, setVerifying] = useState(false);
   const [teamError, setTeamError] = useState('');
 
-=======
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
   const filteredSublines = form.lineId
     ? sublines.filter(s => String(s.research_line_id) === String(form.lineId))
     : sublines;
@@ -89,7 +78,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
     fetchHistory();
   }, [fetchHistory]);
 
-<<<<<<< HEAD
   const handleAddTeamMember = async () => {
     const email = newEmail.trim();
     if (!email) return;
@@ -127,11 +115,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
       setFormError('El proyecto debe tener al menos un autor.');
       return;
     }
-=======
-  const handleSave = async (e) => {
-    e.preventDefault();
-    if (!form.title.trim()) { setFormError('El título es obligatorio.'); return; }
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
 
     setSaving(true);
     setFormError('');
@@ -148,14 +131,11 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
       };
 
       await api.updateProject(project.id, payload);
-<<<<<<< HEAD
 
       if (isAdmin) {
         await api.updateProjectParticipants(project.id, team.map(p => ({ id: p.id, role: p.role })));
       }
 
-=======
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
       setFormSuccess('¡Proyecto actualizado correctamente!');
       setTimeout(() => { onSaved?.(); }, 1200);
     } catch (err) {
@@ -254,7 +234,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
                 </div>
               </div>
 
-<<<<<<< HEAD
               {/* ── EQUIPO DEL PROYECTO (solo admin) ───────────────── */}
               {isAdmin && (
                 <>
@@ -330,8 +309,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
                 </>
               )}
 
-=======
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
               <div className="epm-form-actions">
                 <button type="button" className="epm-btn-ghost" onClick={onClose}>Cancelar</button>
                 <button type="submit" className="epm-btn-primary" disabled={saving}>
@@ -376,8 +353,4 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d

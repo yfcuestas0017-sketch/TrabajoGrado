@@ -34,6 +34,8 @@ function normalizeUser(storedUser) {
     faculty: storedUser.faculty ?? null,
     programId: storedUser.programId ?? null,
     programName: storedUser.programName ?? null,
+    roleId: storedUser.roleId ?? null,
+    permissions: Array.isArray(storedUser.permissions) ? storedUser.permissions : [],
     avatar: storedUser.avatar ?? null,
     authMode: storedUser.authMode || 'postgres',
   };

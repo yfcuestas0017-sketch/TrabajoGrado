@@ -36,7 +36,13 @@ export default function ProtectedRoute({ children, requiredRole, excludedRole })
 
   const canBypassRoleCheck = user.authMode === 'local';
 
-  if (requiredRole && user.role !== requiredRole && !canBypassRoleCheck) {
+  const normalizedUserRole = user.role?.toLowerCase();
+  const normalizedRequiredRole = requiredRole?.toLowerCase();
+  const roleMatches = normalizedRequiredRole === 'admin'
+    ? ['admin', 'administrador'].includes(normalizedUserRole)
+    : normalizedUserRole === normalizedRequiredRole;
+
+  if (requiredRole && !roleMatches && !canBypassRoleCheck) {
     return <Navigate to="/dashboard" replace />;
   }
 

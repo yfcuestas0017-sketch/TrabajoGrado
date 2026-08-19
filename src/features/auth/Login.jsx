@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, UserPlus, LogIn } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../lib/api';
 import Button from '../../components/ui/Button';
 import './Login.css';
 
@@ -26,12 +27,26 @@ export default function Login() {
     fullName: '',
     email: '',
     password: '',
+    semesterId: '',
   });
-
-  if (user) return <Navigate to="/dashboard" replace />;
+  const [semesters, setSemesters] = useState([]);
+  const [semestersLoading, setSemestersLoading] = useState(false);
 
   /* ─── handlers ────────────────────────────────────────────── */
   const switchMode = (m) => { setMode(m); setError(''); setSuccess(''); };
+
+  useEffect(() => {
+    if (mode !== MODES.register || semesters.length > 0) return;
+    let mounted = true;
+    setSemestersLoading(true);
+    api.getCatalogs()
+      .then((catalogs) => { if (mounted) setSemesters(catalogs.semesters || []); })
+      .catch(() => { if (mounted) setError('No fue posible cargar los semestres académicos.'); })
+      .finally(() => { if (mounted) setSemestersLoading(false); });
+    return () => { mounted = false; };
+  }, [mode, semesters.length]);
+
+  if (user) return <Navigate to="/dashboard" replace />;
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -46,11 +61,17 @@ export default function Login() {
   const handleRegister = async (e) => {
     e.preventDefault();
     setError(''); setLoading(true);
+    if (!regForm.semesterId) {
+      setError('Selecciona tu semestre académico.');
+      setLoading(false);
+      return;
+    }
     try {
       await register({
         fullName: regForm.fullName,
         email: regForm.email,
         password: regForm.password,
+        semesterId: regForm.semesterId,
       });
       navigate('/dashboard');
     } catch (err) { setError(err.message); }
@@ -162,6 +183,7 @@ export default function Login() {
                     </button>
                   </div>
                 </div>
+
                 <Button type="submit" loading={loading} fullWidth size="lg">
                   {loading ? 'Ingresando...' : 'Ingresar'}
                 </Button>
@@ -220,6 +242,24 @@ export default function Login() {
                       {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                </div>
+
+                <div className="field">
+                  <label className="field-label">Semestre académico *</label>
+                  <select
+                    required
+                    value={regForm.semesterId}
+                    onChange={setReg('semesterId')}
+                    className="field-input"
+                    disabled={semestersLoading}
+                  >
+                    <option value="">{semestersLoading ? 'Cargando semestres...' : 'Selecciona tu semestre'}</option>
+                    {semesters.map((semester) => (
+                      <option key={semester.semester_id} value={semester.semester_id}>
+                        {semester.semester_number}° semestre
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Nota: rol asignado automáticamente */}

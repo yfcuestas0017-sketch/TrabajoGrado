@@ -39,6 +39,30 @@ export const api = {
 
   // Users
   checkCoauthor: (email) => request(`/users/check-coauthor?email=${encodeURIComponent(email)}`),
+  getStudentResearchProcess: (userId) => request(`/students/${encodeURIComponent(userId)}/research-process`),
+  updateStudentAcademicProfile: (userId, semesterId) => request(`/students/${encodeURIComponent(userId)}/academic-profile`, {
+    method: 'PUT',
+    body: JSON.stringify({ semesterId }),
+  }),
+  getAcademicSettings: (userId) => request(`/admin/academic-settings?userId=${encodeURIComponent(userId)}`),
+  updateSemesterDates: (userId, semesterId, startDate, endDate) => request(`/admin/semesters/${semesterId}/dates`, {
+    method: 'PUT',
+    body: JSON.stringify({ userId, startDate, endDate }),
+  }),
+  applyAcademicPromotion: (userId, referenceDate) => request('/admin/academic-promotion', {
+    method: 'POST',
+    body: JSON.stringify({ userId, referenceDate }),
+  }),
+  getResearchProgress: (projectId, userId) => request(`/projects/${projectId}/research-progress?userId=${encodeURIComponent(userId)}`),
+  createResearchProgress: (projectId, userId, description) => request(`/projects/${projectId}/research-progress`, {
+    method: 'POST',
+    body: JSON.stringify({ userId, description }),
+  }),
+  getResearchDocuments: (projectId, userId) => request(`/projects/${projectId}/research-documents?userId=${encodeURIComponent(userId)}`),
+  createResearchDocument: (projectId, payload) => request(`/projects/${projectId}/research-documents`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
 
   // Projects
   getProjects: () => request('/projects'),
@@ -53,19 +77,20 @@ export const api = {
     body: JSON.stringify(projectData),
   }),
 
-<<<<<<< HEAD
   updateProjectParticipants: (id, participants) => request(`/projects/${id}/participants`, {
     method: 'PUT',
     body: JSON.stringify({ participants }),
   }),
-
-=======
->>>>>>> f8d02141325120ffb2e0a9e1908d2a34e6c55c3d
   deleteProject: (id) => request(`/projects/${id}`, {
     method: 'DELETE',
   }),
 
   getProjectHistory: (id) => request(`/projects/${id}/history`),
+
+  queryChatbook: (userId, message) => request('/chatbook/query', {
+    method: 'POST',
+    body: JSON.stringify({ userId, message }),
+  }),
 
   // Analytics
   getAnalytics: (adminProgramId = null) => request(`/analytics${adminProgramId ? `?adminProgramId=${adminProgramId}` : ''}`),

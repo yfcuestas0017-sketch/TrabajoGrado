@@ -39,7 +39,7 @@ export default function Sidebar() {
   } = useTheme();
   const navigate = useNavigate();
 
-  const canAccessAdmin = user?.role === 'admin' || user?.authMode === 'local';
+  const canAccessAdmin = ['admin', 'administrador'].includes(user?.role?.toLowerCase()) || user?.authMode === 'local';
   const isSidebarExpanded = mobileSidebarOpen || !sidebarCollapsed;
 
   const handleLogout = async () => {
