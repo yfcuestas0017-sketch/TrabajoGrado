@@ -1,10 +1,16 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { randomUUID } from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import pool from './db.js';
 
-dotenv.config({ path: '.env.local' });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -1255,7 +1261,7 @@ app.get('/api/analytics', async (req, res) => {
 });
 
 // Start Express Server
-app.listen(PORT, () => {
-  console.log(`[Express Backend] Servidor ejecutándose en http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[Express Backend] Servidor ejecutándose en http://localhost:${PORT} y http://127.0.0.1:${PORT}`);
   console.log(`[PostgreSQL DB] Conectado a la base de datos BaseDatosGrado`);
 });
