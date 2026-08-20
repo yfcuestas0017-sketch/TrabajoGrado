@@ -26,15 +26,21 @@ function normalizeUser(storedUser) {
 
   if (!email) return null;
 
+  let rawRole = storedUser.role || storedUser.role_name || 'usuario';
+  if (typeof rawRole === 'object' && rawRole !== null) {
+    rawRole = rawRole.name || rawRole.role_name || 'usuario';
+  }
+  const roleString = String(rawRole).toLowerCase();
+
   return {
-    id: storedUser.id ?? null,
-    name: storedUser.name || formatNameFromEmail(email),
+    id: storedUser.id ? String(storedUser.id) : (storedUser.user_id ? String(storedUser.user_id) : null),
+    name: storedUser.name || storedUser.full_name || formatNameFromEmail(email),
     email,
-    role: storedUser.role || 'usuario',
+    role: roleString,
     faculty: storedUser.faculty ?? null,
-    programId: storedUser.programId ?? null,
-    programName: storedUser.programName ?? null,
-    roleId: storedUser.roleId ?? null,
+    programId: storedUser.programId ?? storedUser.program_id ?? null,
+    programName: storedUser.programName ?? storedUser.program_name ?? null,
+    roleId: storedUser.roleId ?? storedUser.role_id ?? null,
     permissions: Array.isArray(storedUser.permissions) ? storedUser.permissions : [],
     avatar: storedUser.avatar ?? null,
     authMode: storedUser.authMode || 'postgres',

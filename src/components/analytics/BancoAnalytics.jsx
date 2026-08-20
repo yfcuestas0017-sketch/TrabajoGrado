@@ -7,8 +7,8 @@ import './BancoAnalytics.css';
 
 export default function BancoAnalytics() {
   const { user } = useAuth();
-  const adminProgramId = user?.role?.toLowerCase() === 'administrador' ? (user?.programId ?? null) : null;
-  const analytics = useAnalytics(adminProgramId);
+  const userProgramId = user?.programId ?? null;
+  const analytics = useAnalytics(userProgramId);
 
   const [filters, setFilters] = useState({
     status: '',
@@ -21,8 +21,9 @@ export default function BancoAnalytics() {
   const filteredProjects = useMemo(() => {
     if (!analytics.projects) return [];
     return analytics.projects.filter(p => {
-      const programName = (p.programName || '').toLowerCase();
-      if (programName && !programName.includes('ingenier') && !programName.includes('sistemas')) return false;
+      if (userProgramId !== null) {
+        if (p.programId && String(p.programId) !== String(userProgramId)) return false;
+      }
       if (searchTitle.trim()) {
         const q = searchTitle.toLowerCase().trim();
         if (!p.title?.toLowerCase().includes(q)) return false;
@@ -33,7 +34,7 @@ export default function BancoAnalytics() {
       if (filters.year && String(p.year) !== filters.year) return false;
       return true;
     });
-  }, [analytics.projects, filters, searchTitle]);
+  }, [analytics.projects, filters, searchTitle, userProgramId]);
 
   const filteredStats = useMemo(() => {
     const byStatus = {};

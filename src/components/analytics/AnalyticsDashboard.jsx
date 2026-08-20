@@ -11,8 +11,8 @@ import { StatusPieChart, LineBarChart, SublineBarChart, TimelineChart } from '..
 export default function AnalyticsDashboard() {
   const { user } = useAuth();
   const role = user?.role?.toLowerCase();
-  const programScopedId = role === 'administrador' || role === 'estudiante' ? (user?.programId ?? null) : null;
-  const analytics = useAnalytics(programScopedId);
+  const userProgramId = user?.programId ?? null;
+  const analytics = useAnalytics(userProgramId);
 
   const [searchTitle, setSearchTitle] = useState('');
 

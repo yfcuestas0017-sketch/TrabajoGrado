@@ -65,7 +65,7 @@ export const api = {
   }),
 
   // Projects
-  getProjects: () => request('/projects'),
+  getProjects: (programId = null) => request(`/projects${programId ? `?programId=${encodeURIComponent(programId)}` : ''}`),
 
   createProject: (projectData) => request('/projects', {
     method: 'POST',
@@ -86,6 +86,20 @@ export const api = {
   }),
 
   getProjectHistory: (id) => request(`/projects/${id}/history`),
+
+  // Reports
+  getDetailedReportProjects: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '' && val !== 'all') {
+        params.append(key, val);
+      }
+    });
+    const queryString = params.toString();
+    return request(`/reports/detailed${queryString ? `?${queryString}` : ''}`);
+  },
+
+  getProjectReportDetail: (id) => request(`/reports/projects/${id}`),
 
   queryChatbook: (userId, message) => request('/chatbook/query', {
     method: 'POST',

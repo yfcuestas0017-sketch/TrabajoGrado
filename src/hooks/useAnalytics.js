@@ -1,7 +1,31 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
 
-export function useAnalytics(adminProgramId = null) {
+const DEFAULT_ANALYTICS = {
+  projects: [],
+  totalProjects: 0,
+  statuses: [],
+  lines: [],
+  sublines: [],
+  programs: [],
+  faculties: [],
+  numStudents: 0,
+  numLines: 0,
+  projectsByStatus: {},
+  projectsByLine: {},
+  projectsBySubline: {},
+  projectsByProgram: {},
+  projectsByYearSemester: [],
+  topLine: null,
+  topProgram: null,
+  topStatus: null,
+  topAdvisor: [],
+  topSublines: [],
+  lineSublineMatrix: {},
+  recentProjects: [],
+};
+
+export function useAnalytics(userProgramId = null) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -11,7 +35,7 @@ export function useAnalytics(adminProgramId = null) {
     setError('');
 
     try {
-      const res = await api.getAnalytics(adminProgramId);
+      const res = await api.getAnalytics(userProgramId);
 
       let projects = res.projects || [];
       const statuses = res.statuses || [];
@@ -22,10 +46,10 @@ export function useAnalytics(adminProgramId = null) {
       const userProjects = res.userProjects || [];
       const students = res.students || [];
 
-      if (adminProgramId !== null) {
+      if (userProgramId !== null) {
         const programUserIds = new Set(
           userProjects
-            .filter(up => String(up.program_id) === String(adminProgramId))
+            .filter(up => String(up.program_id) === String(userProgramId))
             .map(up => up.user_id)
         );
         projects = projects.filter(p =>
@@ -117,8 +141,8 @@ export function useAnalytics(adminProgramId = null) {
         if (up.project_role === 'asesor' && up.full_name) {
           const name = up.full_name;
           let belongsToProgram = true;
-          if (adminProgramId !== null) {
-            belongsToProgram = String(up.program_id) === String(adminProgramId);
+          if (userProgramId !== null) {
+            belongsToProgram = String(up.program_id) === String(userProgramId);
           }
           if (belongsToProgram) {
             advisorProjectCount[name] = (advisorProjectCount[name] || 0) + 1;
@@ -185,11 +209,11 @@ export function useAnalytics(adminProgramId = null) {
     } finally {
       setLoading(false);
     }
-  }, [adminProgramId]);
+  }, [userProgramId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { ...data, loading, error, refetch: fetchData };
+  return { ...DEFAULT_ANALYTICS, ...(data || {}), loading, error, refetch: fetchData };
 }
 
 function getSemester(dateStr) {

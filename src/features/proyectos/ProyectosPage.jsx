@@ -18,7 +18,8 @@ export function ProyectosPage() {
   const isDocente = user?.role?.toLowerCase() === 'docente';
   const isLimitedUser = isStudent || isDocente;
 
-  const adminProgramId = user?.role?.toLowerCase() === 'administrador' ? (user?.programId ?? null) : null;
+  const userProgramId = user?.programId ?? null;
+  const userProgramName = user?.programName || '';
 
   const [filters, setFilters] = useState({
     search: '',
@@ -163,9 +164,10 @@ export function ProyectosPage() {
         );
       }
 
-      if (adminProgramId !== null && !isLimitedUser) {
+      if (userProgramId !== null) {
         userProjects = userProjects.filter(p =>
-          (p.user_projects || []).some(up => String(up.program_id) === String(adminProgramId))
+          String(p.programId) === String(userProgramId) ||
+          (p.user_projects || []).some(up => String(up.program_id) === String(userProgramId))
         );
       }
 
@@ -216,7 +218,7 @@ export function ProyectosPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, user?.role, isLimitedUser, adminProgramId]);
+  }, [user?.id, user?.role, isLimitedUser, userProgramId]);
 
   useEffect(() => {
     if (!isStudent) {
@@ -528,10 +530,10 @@ export function ProyectosPage() {
               <p className="section-subtitle">
                 Administra proyectos, consulta historial y exporta informacion.
               </p>
-              {adminProgramId !== null && (
+              {userProgramId !== null && (
                   <div className="prog-filter-badge">
                     <span className="prog-filter-dot" />
-                    Mostrando solo: <strong>{adminProgramName || 'tu programa'}</strong>
+                    Mostrando solo: <strong>{userProgramName || 'tu programa'}</strong>
                   </div>
                 )}
             </div>

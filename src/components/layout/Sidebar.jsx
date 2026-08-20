@@ -4,6 +4,7 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  FileSpreadsheet,
   FolderOpen,
   GraduationCap,
   LayoutDashboard,
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
 ];
 
 const NAV_BOTTOM = [
+  { to: '/reportes', label: 'Generar reportes', icon: FileSpreadsheet },
   { to: '/usuarios', label: 'Usuarios', icon: Users, adminOnly: true },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ];
