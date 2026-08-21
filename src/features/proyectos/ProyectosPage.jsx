@@ -130,7 +130,7 @@ export function ProyectosPage() {
 
     try {
       const requests = [
-        api.getProjects(),
+        api.getProjects(userProgramId),
         api.getCatalogs(),
       ];
       if (isStudent && user?.id) requests.push(api.getStudentResearchProcess(user.id));
@@ -165,10 +165,7 @@ export function ProyectosPage() {
       }
 
       if (userProgramId !== null) {
-        userProjects = userProjects.filter(p =>
-          String(p.programId) === String(userProgramId) ||
-          (p.user_projects || []).some(up => String(up.program_id) === String(userProgramId))
-        );
+        userProjects = userProjects.filter(p => String(p.programId) === String(userProgramId));
       }
 
       const mappedProjects = userProjects.map((row) => {

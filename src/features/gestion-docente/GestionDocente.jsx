@@ -10,7 +10,7 @@ import './GestionDocente.css';
 
 export default function GestionDocente() {
   const { user } = useAuth();
-  const adminProgramId = user?.role?.toLowerCase() === 'administrador' ? (user?.programId ?? null) : null;
+  const userProgramId = user?.programId ?? null;
 
   const [docentes, setDocentes] = useState([]);
   const [lines, setLines] = useState([]);
@@ -42,20 +42,22 @@ export default function GestionDocente() {
     setLoading(true);
     setError('');
     try {
-      const allProjects = await api.getProjects();
+      const allProjects = await api.getProjects(userProgramId);
 
-      // Construir el listado de docentes a partir de las asignaciones como
-      // asesor y como jurado en cada proyecto.
       const docenteMap = {};
 
       const registerAssignment = (person, project, role) => {
         if (!person?.id) return;
+        if (userProgramId !== null && person.programId && String(person.programId) !== String(userProgramId)) {
+          return;
+        }
         if (!docenteMap[person.id]) {
           docenteMap[person.id] = {
             user_id: person.id,
             full_name: person.name || 'Sin nombre',
             email: person.email || '',
             program_name: person.program || null,
+            programId: person.programId,
             assignments: [],
           };
         }
@@ -74,6 +76,9 @@ export default function GestionDocente() {
       });
 
       let docentesList = Object.values(docenteMap);
+      if (userProgramId !== null) {
+        docentesList = docentesList.filter(d => !d.programId || String(d.programId) === String(userProgramId));
+      }
       docentesList.sort((a, b) => a.full_name.localeCompare(b.full_name));
       setDocentes(docentesList);
     } catch (err) {
@@ -82,7 +87,7 @@ export default function GestionDocente() {
     } finally {
       setLoading(false);
     }
-  }, [adminProgramId]);
+  }, [userProgramId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

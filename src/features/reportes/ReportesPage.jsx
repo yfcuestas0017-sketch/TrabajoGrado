@@ -111,11 +111,8 @@ export default function ReportesPage() {
       });
 
       // Apply strict program isolation for all users and administrators
-      if (userProgramId) {
-        mapped = mapped.filter(p =>
-          String(p.programId) === String(userProgramId) ||
-          (p.user_projects || []).some(up => String(up.program_id) === String(userProgramId))
-        );
+      if (userProgramId !== null) {
+        mapped = mapped.filter(p => String(p.programId) === String(userProgramId));
       }
 
       setProjects(mapped);
