@@ -1554,41 +1554,52 @@ function classifyChatbookQuery(message) {
   };
 }
 
-function formatChatbookProject(row) {
+function formatChatbookProject(row, isStudent = false) {
   const participants = row.participants || [];
   return {
     id: row.project_id,
     title: row.title,
     code: row.code,
-    createdAt: row.created_at,
-    finishedAt: row.finished_at,
+    createdAt: isStudent ? null : row.created_at,
+    finishedAt: isStudent ? null : row.finished_at,
     line: row.line_name,
     subline: row.subline_name,
     modality: row.modality_name,
-    status: row.status_name,
+    status: isStudent ? null : row.status_name,
     authors: participants.filter((person) => ['autor', 'coautor'].includes(String(person.role).toLowerCase())),
-    teachers: participants.filter((person) => ['asesor', 'jurado', 'docente'].includes(String(person.role).toLowerCase())),
-    participants,
+    teachers: isStudent ? [] : participants.filter((person) => ['asesor', 'jurado', 'docente'].includes(String(person.role).toLowerCase())),
+    participants: isStudent ? participants.filter((person) => ['autor', 'coautor'].includes(String(person.role).toLowerCase())) : participants,
   };
 }
 
-function formatProjectMessage(project) {
+function formatProjectMessage(project, role = 'usuario') {
+  const isStudent = role === 'estudiante';
   const peopleInfo = (people) => people.length
     ? people.map((person) => [person.name, person.email, person.program].filter(Boolean).join(' · ') + (person.role ? ` (${person.role})` : '')).join(', ')
     : CHATBOOK_NOT_FOUND;
-  return [
+
+  const lines = [
     'INFORMACIÓN DEL PROYECTO',
     `Nombre: ${project.title || CHATBOOK_NOT_FOUND}`,
     `Código: ${project.code || CHATBOOK_NOT_FOUND}`,
-    `Estado: ${project.status || CHATBOOK_NOT_FOUND}`,
-    `Fecha de inicio: ${project.createdAt ? new Date(project.createdAt).toLocaleDateString('es-CO') : CHATBOOK_NOT_FOUND}`,
-    `Fecha de finalización: ${project.finishedAt ? new Date(project.finishedAt).toLocaleDateString('es-CO') : CHATBOOK_NOT_FOUND}`,
-    `Línea de investigación: ${project.line || CHATBOOK_NOT_FOUND}`,
-    `Sublínea de investigación: ${project.subline || CHATBOOK_NOT_FOUND}`,
-    `Modalidad: ${project.modality || CHATBOOK_NOT_FOUND}`,
-    `Autores: ${peopleInfo(project.authors)}`,
-    `Docentes asociados: ${peopleInfo(project.teachers)}`,
-  ].join('\n');
+  ];
+
+  if (!isStudent) {
+    lines.push(`Estado: ${project.status || CHATBOOK_NOT_FOUND}`);
+    lines.push(`Fecha de inicio: ${project.createdAt ? new Date(project.createdAt).toLocaleDateString('es-CO') : CHATBOOK_NOT_FOUND}`);
+    lines.push(`Fecha de finalización: ${project.finishedAt ? new Date(project.finishedAt).toLocaleDateString('es-CO') : CHATBOOK_NOT_FOUND}`);
+  }
+
+  lines.push(`Línea de investigación: ${project.line || CHATBOOK_NOT_FOUND}`);
+  lines.push(`Sublínea de investigación: ${project.subline || CHATBOOK_NOT_FOUND}`);
+  lines.push(`Modalidad: ${project.modality || CHATBOOK_NOT_FOUND}`);
+  lines.push(`Autores: ${peopleInfo(project.authors)}`);
+
+  if (!isStudent) {
+    lines.push(`Docentes asociados: ${peopleInfo(project.teachers)}`);
+  }
+
+  return lines.join('\n');
 }
 
 app.post('/api/chatbook/query', async (req, res) => {
@@ -1610,6 +1621,7 @@ app.post('/api/chatbook/query', async (req, res) => {
     if (accessRes.rows.length === 0) return res.status(403).json({ error: 'No tienes permisos para consultar esta información.' });
 
     const role = normalizeChatbookRole(accessRes.rows[0].role_name);
+    const isStudent = role === 'estudiante';
     const query = classifyChatbookQuery(message);
     const values = [];
     const filters = [];
@@ -1641,13 +1653,20 @@ app.post('/api/chatbook/query', async (req, res) => {
         FROM public.research_lines rl ${lineFilter} ORDER BY rl.name`,
         lineValues,
       );
-      const lines = linesRes.rows;
+      const lines = linesRes.rows.map((line) => ({
+        ...line,
+        teachers: isStudent ? [] : line.teachers,
+      }));
       return res.json({
         message: lines.length ? `Encontré ${lines.length} línea${lines.length === 1 ? '' : 's'} de investigación.` : CHATBOOK_NOT_FOUND,
         lines,
         projects: [],
         context: null,
       });
+    }
+
+    if (isStudent && query.asksCounts) {
+      return res.json({ message: 'La información de estadísticas por estado no está disponible para estudiantes.', projects: [], context: null });
     }
 
     if (query.wantsMine && role === 'estudiante') {
@@ -1723,11 +1742,11 @@ app.post('/api/chatbook/query', async (req, res) => {
        ORDER BY p.created_at DESC LIMIT 25`,
       values,
     );
-    const projects = projectRes.rows.map(formatChatbookProject);
+    const projects = projectRes.rows.map((row) => formatChatbookProject(row, isStudent));
     const subject = query.wantsMine ? 'asociados a tu cuenta' : 'relacionados con tu consulta';
     return res.json({
       message: projects.length
-        ? (query.asksProjectDetail && projects.length === 1 ? formatProjectMessage(projects[0]) : `Encontré ${projects.length} proyecto${projects.length === 1 ? '' : 's'} ${subject}.`)
+        ? (query.asksProjectDetail && projects.length === 1 ? formatProjectMessage(projects[0], role) : `Encontré ${projects.length} proyecto${projects.length === 1 ? '' : 's'} ${subject}.`)
         : 'No encontré proyectos que coincidan con tu búsqueda.',
       projects,
       context: projects.length === 1 ? projects[0] : null,
