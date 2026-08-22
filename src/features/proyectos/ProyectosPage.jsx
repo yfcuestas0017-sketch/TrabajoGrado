@@ -26,6 +26,7 @@ export function ProyectosPage() {
     status: 'all',
     modality: 'all',
     year: 'all',
+    semester: 'all',
     docenteRole: 'all',
   });
   const [selectedId, setSelectedId] = useState(null);
@@ -189,6 +190,7 @@ export function ProyectosPage() {
           subline: row.subline || 'Sin sublínea',
           sublineId: row.sublineId || '',
           year,
+          semesterNumber: row.semesterNumber ?? null,
           authorsArray: authorsArray.length > 0 ? authorsArray : ['Sin autores'],
           advisor: asesores.length > 0 ? asesores.join(', ') : 'Sin asignar',
           jurados: juradosArray.length > 0 ? juradosArray.join(', ') : 'Sin jurados',
@@ -244,32 +246,51 @@ export function ProyectosPage() {
 
     return Array.from(values);
   }, [projects]);
+  const semesterOptions = useMemo(() => {
+  const values = new Set();
+
+  projects.forEach((project) => {
+    if (project.semesterNumber !== null && project.semesterNumber !== undefined) {
+      values.add(String(project.semesterNumber));
+    }
+  });
+
+  return Array.from(values).sort((a, b) => Number(a) - Number(b));
+}, [projects]);
 
   const filteredProjects = useMemo(() => {
-    const term = filters.search.trim().toLowerCase();
+  const term = filters.search.trim().toLowerCase();
 
-    return projects.filter((project) => {
-      const matchesText =
-        !term ||
-        project.title.toLowerCase().includes(term) ||
-        project.code.toLowerCase().includes(term) ||
-        project.authorsArray.some(a => a.toLowerCase().includes(term));
-      const matchesStatus =
-        filters.status === 'all' || project.status === filters.status;
-      const matchesModality =
-        filters.modality === 'all' || project.modality === filters.modality;
-      const matchesYear =
-        filters.year === 'all' ||
-        project.year === filters.year;
+  return projects.filter((project) => {
+    const matchesText =
+      !term ||
+      project.title.toLowerCase().includes(term) ||
+      project.code.toLowerCase().includes(term) ||
+      project.authorsArray.some(a => a.toLowerCase().includes(term));
 
-      const matchesDocenteRole =
-        !isDocente ||
-        filters.docenteRole === 'all' ||
-        project.myRole === filters.docenteRole;
+    const matchesStatus =
+      filters.status === 'all' || project.status === filters.status;
 
-      return matchesText && matchesStatus && matchesModality && matchesYear && matchesDocenteRole;
-    });
-  }, [filters, projects, isDocente]);
+    const matchesModality =
+      filters.modality === 'all' || project.modality === filters.modality;
+
+    const matchesYear =
+      filters.year === 'all' ||
+      project.year === filters.year;
+
+    const matchesSemester =
+      !isDocente ||
+      filters.semester === 'all' ||
+      String(project.semesterNumber ?? '') === String(filters.semester);
+
+    const matchesDocenteRole =
+      !isDocente ||
+      filters.docenteRole === 'all' ||
+      project.myRole === filters.docenteRole;
+
+    return matchesText && matchesStatus && matchesModality && matchesYear && matchesSemester && matchesDocenteRole;
+  });
+}, [filters, projects, isDocente]);
 
   const selectedProject =
     projects.find((project) => project.id === selectedId) || projects[0];

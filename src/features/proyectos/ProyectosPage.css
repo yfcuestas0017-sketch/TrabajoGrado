@@ -322,8 +322,7 @@
 
         .projects-content {
           display: grid;
-          grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-          gap: 18px;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));          gap: 18px;
         }
 
         .table-wrap {

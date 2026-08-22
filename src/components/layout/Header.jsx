@@ -15,6 +15,14 @@ export default function Header({ title, subtitle }) {
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifError, setNotifError] = useState('');
   const [assignedProjects, setAssignedProjects] = useState([]);
+  const [seenKeys, setSeenKeys] = useState(() => {
+  try {
+    const stored = localStorage.getItem(`notif_seen_${user?.id}`);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+});
   const notifRef = useRef(null);
   const { toggleMobileSidebar } = useTheme();
 
@@ -59,15 +67,22 @@ export default function Header({ title, subtitle }) {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!notifOpen) return;
-    const handleClickOutside = (event) => {
-      if (notifRef.current && !notifRef.current.contains(event.target)) {
-        setNotifOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [notifOpen]);
+  if (!notifOpen) return;
+
+  const allKeys = assignedProjects.map((item) => `${item.projectId}-${item.role}`);
+  const updatedSeen = new Set([...seenKeys, ...allKeys]);
+  setSeenKeys(updatedSeen);
+
+  try {
+    localStorage.setItem(`notif_seen_${user?.id}`, JSON.stringify([...updatedSeen]));
+  } catch {
+    
+  }
+}, [notifOpen]);
+
+const unseenProjects = assignedProjects.filter(
+  (item) => !seenKeys.has(`${item.projectId}-${item.role}`)
+);
 
   return (
     <>
@@ -107,8 +122,8 @@ export default function Header({ title, subtitle }) {
               onClick={() => setNotifOpen((prev) => !prev)}
             >
               <Bell size={18} />
-              {assignedProjects.length > 0 && (
-                <span className="notif-badge">{assignedProjects.length}</span>
+              {unseenProjects.length > 0 && (
+                <span className="notif-badge">{unseenProjects.length}</span>
               )}
             </button>
 
