@@ -107,7 +107,19 @@ export function ProyectosPage() {
     try {
       const data = await api.getProjectHistory(projectId);
       const mappedHistory = (data ?? []).map((history) => {
-        const title = history.description || 'Actualización registrada';
+        const field = (history.modified_field || '').toLowerCase();
+        let title = history.description || 'Actualización registrada';
+        if (field === 'title') title = 'Modificación de Título';
+        else if (field === 'status_id') title = 'Actualización de Estado';
+        else if (field === 'modality_id') title = 'Actualización de Modalidad';
+        else if (field === 'research_line_id') title = 'Actualización de Línea de Investigación';
+        else if (field === 'research_subline_id') title = 'Actualización de Sublínea de Investigación';
+        else if (field === 'letter_link') title = 'Actualización de Enlace / Carta de Aprobación';
+        else if (field === 'code') title = 'Modificación de Código del Proyecto';
+        else if (history.description && history.description.includes(': "')) {
+          title = history.description.split(': "')[0];
+        }
+
         const date = history.changed_at
           ? new Date(history.changed_at).toLocaleString('es-CO', {
               year: 'numeric',
@@ -1177,19 +1189,16 @@ export function ProyectosPage() {
                           </div>
 
                           {/* VALOR ANTERIOR vs VALOR NUEVO */}
-                          {item.modifiedField && (
+                          {item.modifiedField && (item.oldValue || item.newValue) && (
                             <div style={{ marginTop: '8px', background: 'var(--bg-secondary)', padding: '12px 14px', borderRadius: '8px', fontSize: '0.86rem' }}>
-                              <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                Campo modificado: <strong style={{ color: 'var(--text-primary)' }}>{item.modifiedField}</strong>
-                              </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div style={{ background: 'rgba(224, 15, 56, 0.06)', borderLeft: '3px solid #E00F38', padding: '8px 10px', borderRadius: '4px' }}>
                                   <small style={{ color: '#E00F38', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Valor anterior:</small>
-                                  <span style={{ color: 'var(--text-primary)' }}>{item.oldValue || '—'}</span>
+                                  <span style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{item.oldValue || '—'}</span>
                                 </div>
                                 <div style={{ background: 'rgba(34, 197, 94, 0.06)', borderLeft: '3px solid #22c55e', padding: '8px 10px', borderRadius: '4px' }}>
                                   <small style={{ color: '#22c55e', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Valor nuevo:</small>
-                                  <span style={{ color: 'var(--text-primary)' }}>{item.newValue || '—'}</span>
+                                  <span style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{item.newValue || '—'}</span>
                                 </div>
                               </div>
                             </div>

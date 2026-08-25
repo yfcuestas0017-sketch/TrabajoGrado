@@ -1135,7 +1135,22 @@ app.get('/api/projects/:id/history', async (req, res) => {
       ORDER BY h.changed_at DESC;
     `;
     const result = await pool.query(query, [projectId]);
-    res.json(result.rows);
+
+    // Filtrar filas duplicadas generadas automáticamente por disparadores de BD sin usuario registrado
+    const cleanRows = result.rows.filter((row, idx, arr) => {
+      if (!row.user_id) {
+        const isGenericTrigger = ['Title modification', 'Status update', 'Proyecto actualizado'].includes(row.description);
+        const hasUserDetailRow = arr.some((other) =>
+          other.history_id !== row.history_id &&
+          other.user_id &&
+          (other.modified_field === row.modified_field || Math.abs(new Date(other.changed_at) - new Date(row.changed_at)) < 5000)
+        );
+        if (isGenericTrigger || hasUserDetailRow) return false;
+      }
+      return true;
+    });
+
+    res.json(cleanRows);
   } catch (err) {
     console.error('Get history error:', err);
     res.status(500).json({ error: 'Error al cargar historial.' });
