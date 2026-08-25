@@ -2012,8 +2012,8 @@ app.post('/api/chatbook/query', async (req, res) => {
       }
     }
     if (matchedTeacher && !/que docentes estan|que docentes son|que docentes existen|que docentes hay|que docentes tienen|docentes pertenecen a|lineas de investigacion|que lineas|que sublineas|proyectos estan proximos|comenzaron recientemente|terminan este mes|fechas de los proyectos|muestrame todos|todos los proyectos|por fecha de finalizacion|cuantos proyectos|proyectos por estado|proyectos por modalidad|proyectos estan en ejecucion|proyectos estan terminados|proyectos estan pendientes|proyectos estan disponibles|proyectos por linea|proyectos tiene cada linea|proyectos asociados a cada linea|proyectos tienen asignado/.test(norm)) {
-      if (isStudent && !/quien es mi|mi docente|mi asesor|mi proyecto/.test(norm)) {
-        return res.json({ message: 'La consulta general sobre otros docentes no está disponible para el perfil de estudiante.', projects: [] });
+      if (isStudent) {
+        return res.json({ message: 'Las consultas sobre docentes no están disponibles para el perfil de estudiante.', projects: [], stats: [] });
       }
 
       const profile = await getTeacherFullProfile(matchedTeacher.user_id, programId);
@@ -2122,6 +2122,15 @@ app.post('/api/chatbook/query', async (req, res) => {
     // 1. ROL ESTUDIANTE: CONSULTAS ESPECÍFICAS
     // ──────────────────────────────────────────────────────────────────────────
     if (isStudent) {
+      // Bloqueo de consultas sobre fechas y docentes para el perfil de estudiante
+      if (/fecha|fechas|inicia|termina|duracion|dura|tiempo restante|cronogram|finalizacion|docente|docentes|profesor|profesores|asesor|asesores|jurado|jurados/.test(norm)) {
+        return res.json({
+          message: 'Las consultas sobre fechas y docentes no están disponibles para el perfil de estudiante.',
+          projects: [],
+          stats: [],
+        });
+      }
+
       // Proyectos del estudiante autenticado
       const myProjectsRes = await pool.query(`
         SELECT p.project_id, p.code, p.title, p.created_at, p.finished_at,

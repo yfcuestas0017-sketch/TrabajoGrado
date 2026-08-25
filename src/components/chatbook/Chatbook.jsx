@@ -6,17 +6,14 @@ import './Chatbook.css';
 
 const ROLE_CATEGORIES = {
   estudiante: {
-    fechas: {
-      label: 'Fechas',
-      icon: CalendarDays,
+    proyectos: {
+      label: 'Proyectos',
+      icon: FolderGit2,
       questions: [
-        '¿Cuándo inicia mi proyecto?',
-        '¿Cuándo termina mi proyecto?',
-        '¿Cuánto tiempo dura mi proyecto?',
-        '¿Cuánto falta para que termine mi proyecto?',
-        '¿Cuáles son las fechas de mis proyectos?',
-        '¿Cuál de mis proyectos termina primero?',
-        '¿Cuál de mis proyectos está próximo a terminar?',
+        '¿Cuáles son mis proyectos?',
+        '¿Qué proyectos están disponibles?',
+        'Busca proyectos relacionados con mi línea.',
+        'Muéstrame proyectos similares.',
       ],
     },
     estados: {
@@ -30,17 +27,6 @@ const ROLE_CATEGORIES = {
         '¿Tengo algún proyecto terminado?',
       ],
     },
-    proyectos: {
-      label: 'Proyectos',
-      icon: FolderGit2,
-      questions: [
-        '¿Cuáles son mis proyectos?',
-        '¿Qué proyectos están disponibles?',
-        'Busca proyectos relacionados con mi línea.',
-        'Busca proyectos sobre inteligencia artificial.',
-        'Muéstrame proyectos similares.',
-      ],
-    },
     lineas: {
       label: 'Líneas',
       icon: LineChart,
@@ -49,15 +35,6 @@ const ROLE_CATEGORIES = {
         '¿Cuál es la sublínea de mi proyecto?',
         '¿Qué proyectos existen en mi línea?',
         '¿Qué otras líneas existen?',
-      ],
-    },
-    docentes: {
-      label: 'Docentes',
-      icon: Users,
-      questions: [
-        '¿Quién es mi docente asesor?',
-        '¿Qué docente está asociado a mi proyecto?',
-        '¿Qué docentes pertenecen a mi línea?',
       ],
     },
   },
@@ -340,7 +317,7 @@ export default function Chatbook() {
   const [activeCategory, setActiveCategory] = useState('proyectos');
 
   const welcomeText = isStudent
-    ? `Hola. Soy Chatbook, tu asistente virtual para la gestión de proyectos de grado en ${programName}. Puedo orientarte en fechas, estados, proyectos, líneas y tu docente asesor. ¿Qué deseas consultar hoy?`
+    ? `Hola. Soy Chatbook, tu asistente virtual para la gestión de proyectos de grado en ${programName}. Puedo orientarte en tus proyectos, sus estados y líneas de investigación. ¿Qué deseas consultar hoy?`
     : roleKey === 'docente'
       ? `Hola. Soy Chatbook, tu asistente virtual para la gestión de proyectos de grado en ${programName}. Puedes consultar los proyectos que asesoras, fechas de entrega, estados, estudiantes y líneas de investigación. ¿En qué te puedo colaborar?`
       : `Hola. Soy Chatbook, tu asistente de gestión de proyectos de grado para ${programName}. Puedo ayudarte con estadísticas, proyectos por estado, fechas de finalización, líneas de investigación y docentes. ¿Qué deseas consultar?`;
