@@ -70,6 +70,37 @@
   --transition-slow: 0.4s ease;
 }
 
+/* ---- THEME: Dark / Modo Noche ---- */
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-card: #1e293b;
+  --bg-header: rgba(30, 41, 59, 0.95);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #0f172a;
+
+  --sidebar-bg: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  --sidebar-text: #ffffff;
+  --sidebar-text-active: #ffffff;
+  --sidebar-accent: #38bdf8;
+  --sidebar-hover: rgba(255, 255, 255, 0.12);
+  --sidebar-active-bg: rgba(56, 189, 248, 0.25);
+  --sidebar-border: rgba(255, 255, 255, 0.15);
+
+  --accent-primary: #38bdf8;
+  --accent-primary-hover: #0ea5e9;
+  --accent-secondary: #f43f5e;
+  --accent-secondary-hover: #e11d48;
+
+  --border-color: #334155;
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.5);
+}
+
 /* ---- THEME: Ocean ---- */
 [data-theme="ocean"] {
   --sidebar-bg: #0a1628;

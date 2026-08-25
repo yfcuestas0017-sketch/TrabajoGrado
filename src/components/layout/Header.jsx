@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Menu, Palette, Search } from 'lucide-react';
+import { Bell, Menu, Palette } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import ThemePanel from '../ui/ThemePanel';
@@ -105,15 +105,6 @@ const unseenProjects = assignedProjects.filter(
         </div>
 
         <div className="header-actions">
-          <div className="header-search">
-            <Search size={15} className="header-search-icon" />
-            <input
-              type="text"
-              placeholder="Buscar proyectos..."
-              className="header-search-input"
-            />
-          </div>
-
           <div className="header-notif" ref={notifRef}>
             <button
               type="button"
