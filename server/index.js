@@ -3263,8 +3263,14 @@ app.get('/api/analytics', async (req, res) => {
   }
 });
 
+
+  
 // Start Express Server
+
+
+
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Express Backend] Servidor ejecutándose en http://localhost:${PORT} y http://127.0.0.1:${PORT}`);
+  console.log(`[Express Backend] Servidor ejecutándose en el puerto ${PORT}`);
   console.log(`[PostgreSQL DB] Conectado a la base de datos BaseDatosGrado`);
 });
