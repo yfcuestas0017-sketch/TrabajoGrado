@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BarChart3, BookOpen, ChevronDown, Download, ExternalLink, Eye, FilePlus2, Filter, History, Pencil,
-  Settings, Trash2, Upload, Users, X,
+  BarChart3, BookOpen, ChevronDown, Clock, Download, ExternalLink, Eye, FilePlus2, Filter, History, Pencil,
+  Settings, Trash2, Upload, User, Users, X,
 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
@@ -108,14 +108,29 @@ export function ProyectosPage() {
       const data = await api.getProjectHistory(projectId);
       const mappedHistory = (data ?? []).map((history) => {
         const title = history.description || 'Actualización registrada';
-        const detail = history.modified_field
-          ? `${history.modified_field}: ${history.old_value ?? '-'} -> ${history.new_value ?? '-'}`
-          : history.change_type || 'Actualización';
         const date = history.changed_at
-          ? new Date(history.changed_at).toLocaleDateString('es-CO')
+          ? new Date(history.changed_at).toLocaleString('es-CO', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
           : 'Sin fecha';
 
-        return { id: history.history_id, title, detail, date };
+        return {
+          id: history.history_id,
+          title,
+          modifiedField: history.modified_field || null,
+          oldValue: history.old_value || null,
+          newValue: history.new_value || null,
+          changeType: history.change_type || 'UPDATE',
+          userName: history.user_name || 'Sistema / Registro',
+          userEmail: history.user_email || '',
+          userRole: history.user_role || 'Usuario',
+          userProgram: history.user_program || '',
+          date,
+        };
       });
       setHistoryItems(mappedHistory);
     } catch (_) {
@@ -991,7 +1006,17 @@ export function ProyectosPage() {
                           Ver
                         </Button>
                         {!isLimitedUser && (
-                          <Button variant="ghost" size="sm" onClick={() => setEditModal(project)}>Editar</Button>
+                          <>
+                            <Button variant="ghost" size="sm" onClick={() => setEditModal(project)}>Editar</Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={History}
+                              onClick={() => { setHistoryModal(project); fetchHistory(project.id); }}
+                            >
+                              Historial
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -1112,11 +1137,12 @@ export function ProyectosPage() {
         {/* ── MODAL HISTORIAL ─────────────────────────────────── */}
         {historyModal && (
           <div className="modal-backdrop" onClick={() => setHistoryModal(null)}>
-            <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-box modal-box--lg" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <div className="modal-header-text">
-                  <span className="modal-eyebrow">Historial de cambios</span>
-                  <h2 className="modal-title">{historyModal.title}</h2>
+                  <span className="modal-eyebrow">Auditoría y trazabilidad</span>
+                  <h2 className="modal-title">Historial de Cambios: {historyModal.title}</h2>
+                  <span className="modal-code">{historyModal.code}</span>
                 </div>
                 <button className="modal-close" type="button" onClick={() => setHistoryModal(null)}>
                   <X size={18} />
@@ -1125,24 +1151,57 @@ export function ProyectosPage() {
 
               <div className="modal-body">
                 {historyLoading ? (
-                  <div className="history-empty">Cargando historial...</div>
+                  <div className="history-empty">Cargando historial de auditoría...</div>
                 ) : historyItems.length > 0 ? (
                   <div className="history-timeline">
                     {historyItems.map((item) => (
-                      <div key={item.id} className="timeline-item">
+                      <div key={item.id} className="timeline-item" style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px dashed var(--border-color)' }}>
                         <div className="timeline-dot" />
-                        <div className="timeline-content">
-                          <div className="timeline-title">{item.title}</div>
-                          <div className="timeline-detail">{item.detail}</div>
-                          <span className="timeline-date">{item.date}</span>
+                        <div className="timeline-content" style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                            <div className="timeline-title" style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.96rem' }}>
+                              {item.title}
+                            </div>
+                            <span className="timeline-date" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={14} /> {item.date}
+                            </span>
+                          </div>
+
+                          {/* USUARIO QUE REALIZÓ EL CAMBIO */}
+                          <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', background: 'rgba(31, 91, 163, 0.08)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.84rem', marginBottom: '10px' }}>
+                            <User size={15} style={{ color: '#1F5BA3' }} />
+                            <span>Modificado por: <strong style={{ color: '#1F5BA3' }}>{item.userName}</strong></span>
+                            <span style={{ background: '#2C3967', color: '#ffffff', padding: '1px 7px', borderRadius: '12px', fontSize: '0.74rem', textTransform: 'capitalize' }}>{item.userRole}</span>
+                            {item.userProgram && <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>· {item.userProgram}</span>}
+                            {item.userEmail && <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>({item.userEmail})</span>}
+                          </div>
+
+                          {/* VALOR ANTERIOR vs VALOR NUEVO */}
+                          {item.modifiedField && (
+                            <div style={{ marginTop: '8px', background: 'var(--bg-secondary)', padding: '12px 14px', borderRadius: '8px', fontSize: '0.86rem' }}>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Campo modificado: <strong style={{ color: 'var(--text-primary)' }}>{item.modifiedField}</strong>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
+                                <div style={{ background: 'rgba(224, 15, 56, 0.06)', borderLeft: '3px solid #E00F38', padding: '8px 10px', borderRadius: '4px' }}>
+                                  <small style={{ color: '#E00F38', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Valor anterior:</small>
+                                  <span style={{ color: 'var(--text-primary)' }}>{item.oldValue || '—'}</span>
+                                </div>
+                                <div style={{ background: 'rgba(34, 197, 94, 0.06)', borderLeft: '3px solid #22c55e', padding: '8px 10px', borderRadius: '4px' }}>
+                                  <small style={{ color: '#22c55e', fontWeight: 600, display: 'block', marginBottom: '2px' }}>Valor nuevo:</small>
+                                  <span style={{ color: 'var(--text-primary)' }}>{item.newValue || '—'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="history-empty">
-                    <History size={36} style={{ opacity: 0.25, marginBottom: 10 }} />
-                    <p>No hay registros de cambios para este proyecto.</p>
+                    <History size={38} style={{ opacity: 0.25, marginBottom: 10 }} />
+                    <p>No hay registros de cambios almacenados para este proyecto.</p>
                   </div>
                 )}
               </div>
@@ -1165,6 +1224,12 @@ export function ProyectosPage() {
           sublines={sublines}
           user={user}
           onClose={() => setEditModal(null)}
+          onOpenHistory={() => {
+            const project = editModal;
+            setEditModal(null);
+            setHistoryModal(project);
+            fetchHistory(project.id);
+          }}
           onSaved={() => { setEditModal(null); loadData(); }}
         />
         )}

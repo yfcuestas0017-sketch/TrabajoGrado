@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { X, ChevronDown, Save, Loader2, Plus, Trash2, Users } from 'lucide-react';
+import { X, ChevronDown, Save, Loader2, Plus, Trash2, Users, History } from 'lucide-react';
 import api from '../../lib/api';
 import './EditProjectModal.css';
 
@@ -27,7 +27,7 @@ function Avatar({ name, size = 30 }) {
   );
 }
 
-export default function EditProjectModal({ project, statuses, modalities, lines, sublines, user, onClose, onSaved }) {
+export default function EditProjectModal({ project, statuses, modalities, lines, sublines, user, onClose, onSaved, onOpenHistory }) {
   const isAdmin = user?.role?.toLowerCase() === 'administrador';
 
   const [form, setForm] = useState({
@@ -130,10 +130,10 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
         letterLink: form.letterLink.trim() || null,
       };
 
-      await api.updateProject(project.id, payload);
+      await api.updateProject(project.id, payload, user?.id);
 
       if (isAdmin) {
-        await api.updateProjectParticipants(project.id, team.map(p => ({ id: p.id, role: p.role })));
+        await api.updateProjectParticipants(project.id, team.map(p => ({ id: p.id, role: p.role })), user?.id);
       }
 
       setFormSuccess('¡Proyecto actualizado correctamente!');
@@ -155,7 +155,12 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
             <h2 className="epm-title">{project.title}</h2>
             <span className="epm-code">{project.code || 'Sin código'}</span>
           </div>
-          <button className="epm-close-btn" type="button" onClick={onClose}><X size={16} /></button>
+          <div className="epm-header-actions">
+            <button className="epm-history-btn" type="button" onClick={onOpenHistory} title="Ver historial del proyecto">
+              <History size={15} /> Historial
+            </button>
+            <button className="epm-close-btn" type="button" onClick={onClose} title="Cerrar"><X size={16} /></button>
+          </div>
         </div>
 
         {/* BODY */}
@@ -341,7 +346,11 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
                         </span>
                       )}
                       <span className="epm-history-date">
-                        {item.changed_at ? new Date(item.changed_at).toLocaleString() : ''}
+                        {item.changed_at ? new Date(item.changed_at).toLocaleString('es-CO') : ''}
+                      </span>
+                      <span className="epm-history-user">
+                        {item.user_name || item.user_email || 'Usuario no identificado'}
+                        {item.user_email && item.user_name ? ` · ${item.user_email}` : ''}
                       </span>
                     </div>
                   ))}

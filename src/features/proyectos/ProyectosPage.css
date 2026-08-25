@@ -1053,6 +1053,13 @@
           font-family: monospace;
         }
 
+        .timeline-user {
+          font-size: 0.75rem;
+          color: var(--accent-primary);
+          font-weight: 600;
+          margin-top: 4px;
+        }
+
         .timeline-date {
           font-size: 0.72rem;
           color: var(--text-muted);
