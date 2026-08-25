@@ -21,11 +21,24 @@ app.use(express.json());
 // Health Check
 app.get('/api/health', async (req, res) => {
   try {
-    const result = await pool.query('SELECT NOW()');
-    res.json({ status: 'ok', timestamp: result.rows[0].now, database: 'BaseDatosGrado' });
-  } catch (err) {
-    console.error('Health check error:', err);
-    res.status(500).json({ status: 'error', message: err.message });
+    const result = await pool.query(`
+      SELECT 
+        current_database() AS database,
+        current_user AS user,
+        version() AS version
+    `);
+
+    res.json({
+      status: 'ok',
+      postgresql: result.rows[0]
+    });
+  } catch (error) {
+    console.error('[Health Check Error]', error);
+
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
   }
 });
 
