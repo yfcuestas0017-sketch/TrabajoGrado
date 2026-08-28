@@ -141,7 +141,7 @@ export function ProyectosPage() {
           userName: history.user_name || 'Sistema / Registro',
           userEmail: history.user_email || '',
           userRole: history.user_role || 'Usuario',
-          userProgram: history.user_program || '',
+          userProgram: history.program_name || history.user_program || '',
           date,
         };
       });
@@ -572,7 +572,7 @@ export function ProyectosPage() {
 
     try {
       if (editProjectId) {
-        await api.updateProject(editProjectId, payload);
+        await api.updateProject(editProjectId, payload, user?.id);
         setFormSuccess('Proyecto actualizado correctamente.');
       } else {
         await api.createProject(payload);

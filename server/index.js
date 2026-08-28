@@ -391,7 +391,7 @@ app.put('/api/students/:userId/academic-profile', async (req, res) => {
       return res.status(400).json({ error: 'El semestre seleccionado no existe.' });
     }
     const curriculumRes = await client.query(
-      `SELECT curriculum_id FROM public.academic_curricula WHERE status = 'activo' ORDER BY curriculum_id LIMIT 1`,
+      `SELECT curriculum_id FROM public.academic_curricula WHERE LOWER(status) = 'activo' ORDER BY curriculum_id LIMIT 1`,
     );
     if (curriculumRes.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -563,9 +563,9 @@ app.post('/api/projects/:id/research-progress', async (req, res) => {
 
     // Registrar en el historial del proyecto
     const histRes = await client.query(
-      `INSERT INTO public.histories (description, change_type)
-       VALUES ($1, 'AVANCE') RETURNING history_id`,
-      [`Registro de avance de investigación: ${String(description).trim().slice(0, 100)}`],
+      `INSERT INTO public.histories (description, change_type, user_id)
+       VALUES ($1, 'AVANCE', $2) RETURNING history_id`,
+      [`Registro de avance de investigación: ${String(description).trim().slice(0, 100)}`, String(userId)],
     );
     await client.query(
       `INSERT INTO public.project_histories (project_id, history_id) VALUES ($1, $2)`,
@@ -619,9 +619,9 @@ app.post('/api/projects/:id/research-documents', async (req, res) => {
 
     // Registrar en el historial del proyecto
     const histRes = await client.query(
-      `INSERT INTO public.histories (description, change_type)
-       VALUES ($1, 'DOCUMENTO') RETURNING history_id`,
-      [`Entrega de documento de investigación: ${String(documentType).trim()}`],
+      `INSERT INTO public.histories (description, change_type, user_id)
+       VALUES ($1, 'DOCUMENTO', $2) RETURNING history_id`,
+      [`Entrega de documento de investigación: ${String(documentType).trim()}`, String(userId)],
     );
     await client.query(
       `INSERT INTO public.project_histories (project_id, history_id) VALUES ($1, $2)`,
@@ -1174,36 +1174,23 @@ app.get('/api/projects/:id/history', async (req, res) => {
         h.change_type, 
         h.changed_at,
         h.user_id,
-        u.full_name as user_name,
-        u.email as user_email,
-        COALESCE(r.name, 'Usuario') as user_role,
-        COALESCE(pr.name, 'Sin programa') as user_program
-      FROM public.project_histories ph
-      JOIN public.histories h ON ph.history_id = h.history_id
-      LEFT JOIN public.users u ON h.user_id::text = u.user_id::text
-      LEFT JOIN public.user_roles ur ON u.user_id = ur.user_id
-      LEFT JOIN public.roles r ON ur.role_id = r.role_id
-      LEFT JOIN public.programs pr ON u.program_id = pr.program_id
+        u.full_name AS user_name,
+        u.email AS user_email,
+        u.program_id,
+        p.name AS program_name,
+        COALESCE(r.name, 'Usuario') AS user_role
+      FROM public.histories h
+      LEFT JOIN public.users u ON u.user_id::text = h.user_id::text
+      LEFT JOIN public.programs p ON p.program_id = u.program_id
+      LEFT JOIN public.user_roles ur ON ur.user_id::text = u.user_id::text
+      LEFT JOIN public.roles r ON r.role_id = ur.role_id
+      JOIN public.project_histories ph ON ph.history_id = h.history_id
       WHERE ph.project_id = $1
       ORDER BY h.changed_at DESC;
     `;
     const result = await pool.query(query, [projectId]);
 
-    // Filtrar filas duplicadas generadas automáticamente por disparadores de BD sin usuario registrado
-    const cleanRows = result.rows.filter((row, idx, arr) => {
-      if (!row.user_id) {
-        const isGenericTrigger = ['Title modification', 'Status update', 'Proyecto actualizado'].includes(row.description);
-        const hasUserDetailRow = arr.some((other) =>
-          other.history_id !== row.history_id &&
-          other.user_id &&
-          (other.modified_field === row.modified_field || Math.abs(new Date(other.changed_at) - new Date(row.changed_at)) < 5000)
-        );
-        if (isGenericTrigger || hasUserDetailRow) return false;
-      }
-      return true;
-    });
-
-    res.json(cleanRows);
+    res.json(result.rows);
   } catch (err) {
     console.error('Get history error:', err);
     res.status(500).json({ error: 'Error al cargar historial.' });
@@ -1508,9 +1495,26 @@ app.get('/api/reports/projects/:id', async (req, res) => {
         WHERE up.project_id = $1
       `, [projectId]),
       pool.query(`
-        SELECT h.history_id, h.description, h.modified_field, h.old_value, h.new_value, h.change_type, h.changed_at
+        SELECT 
+          h.history_id, 
+          h.description, 
+          h.modified_field, 
+          h.old_value, 
+          h.new_value, 
+          h.change_type, 
+          h.changed_at,
+          h.user_id,
+          u.full_name AS user_name,
+          u.email AS user_email,
+          u.program_id,
+          p.name AS program_name,
+          COALESCE(r.name, 'Usuario') AS user_role
         FROM public.project_histories ph
         JOIN public.histories h ON ph.history_id = h.history_id
+        LEFT JOIN public.users u ON u.user_id::text = h.user_id::text
+        LEFT JOIN public.programs p ON p.program_id = u.program_id
+        LEFT JOIN public.user_roles ur ON ur.user_id::text = u.user_id::text
+        LEFT JOIN public.roles r ON r.role_id = ur.role_id
         WHERE ph.project_id = $1
         ORDER BY h.changed_at DESC;
       `, [projectId]),
