@@ -39,8 +39,13 @@ export function useAnalytics(userProgramId = null) {
 
       let projects = res.projects || [];
       const statuses = res.statuses || [];
-      const lines = res.lines || [];
-      const sublines = res.sublines || [];
+      const rawLines = res.lines || [];
+      const lines = userProgramId !== null
+        ? rawLines.filter(l => !l.program_id || String(l.program_id) === String(userProgramId))
+        : rawLines;
+      const sublines = userProgramId !== null
+        ? (res.sublines || []).filter(sl => lines.some(l => l.research_line_id === sl.research_line_id))
+        : (res.sublines || []);
       const programs = res.programs || [];
       const faculties = res.faculties || [];
       const userProjects = res.userProjects || [];

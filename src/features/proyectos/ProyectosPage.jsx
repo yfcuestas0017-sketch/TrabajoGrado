@@ -132,7 +132,7 @@ export function ProyectosPage() {
     try {
       const requests = [
         api.getProjects(userProgramId),
-        api.getCatalogs(),
+        api.getCatalogs(userProgramId),
       ];
       if (isStudent && user?.id) requests.push(api.getStudentResearchProcess(user.id));
       const [allProjects, catalogs, academicProcess] = await Promise.all(requests);
@@ -151,10 +151,31 @@ export function ProyectosPage() {
         }
       }
 
+      const isPsicologia = String(userProgramId) === '2' || String(userProgramName).toLowerCase().includes('psicolog');
+      const isSistemas = String(userProgramId) === '1' || String(userProgramName).toLowerCase().includes('sistema');
+
+      const allCatLines = catalogs.lines || [];
+      const progLines = allCatLines.filter(l => {
+        if (l.program_id !== undefined && l.program_id !== null) {
+          return String(l.program_id) === String(userProgramId);
+        }
+        const name = (l.name || '').toLowerCase();
+        if (isPsicologia) {
+          return [4, 5, 6].includes(l.research_line_id) || name.includes('psicolog');
+        }
+        if (isSistemas) {
+          return [1, 2, 3].includes(l.research_line_id) || (!name.includes('psicolog') && !name.includes('salud') && !name.includes('comunitaria'));
+        }
+        return true;
+      });
+
+      const allCatSublines = catalogs.sublines || [];
+      const progSublines = allCatSublines.filter(sl => progLines.some(l => l.research_line_id === sl.research_line_id));
+
       setStatuses(catalogs.statuses || []);
       setModalities(catalogs.modalities || []);
-      setLines(catalogs.lines || []);
-      setSublines(catalogs.sublines || []);
+      setLines(progLines);
+      setSublines(progSublines);
       setAcademicSemesters(catalogs.semesters || []);
 
       let userProjects = allProjects || [];

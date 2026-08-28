@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { X, ChevronDown, Save, Loader2, Plus, Trash2, Users } from 'lucide-react';
 import api from '../../lib/api';
 import './EditProjectModal.css';
@@ -58,9 +58,37 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
   const [verifying, setVerifying] = useState(false);
   const [teamError, setTeamError] = useState('');
 
-  const filteredSublines = form.lineId
-    ? sublines.filter(s => String(s.research_line_id) === String(form.lineId))
-    : sublines;
+  const targetProgramId = project?.programId ?? user?.programId ?? user?.program_id ?? null;
+  const targetProgramName = String(project?.programName ?? user?.programName ?? user?.program_name ?? '').toLowerCase();
+  const isPsicologia = String(targetProgramId) === '2' || targetProgramName.includes('psicolog');
+  const isSistemas = String(targetProgramId) === '1' || targetProgramName.includes('sistema');
+
+  const filteredLines = useMemo(() => {
+    const allLines = lines || [];
+    if (!allLines.length) return [];
+
+    return allLines.filter(line => {
+      if (line.program_id !== undefined && line.program_id !== null) {
+        return String(line.program_id) === String(targetProgramId);
+      }
+      const name = (line.name || '').toLowerCase();
+      if (isPsicologia) {
+        return [4, 5, 6].includes(line.research_line_id) || name.includes('psicolog');
+      }
+      if (isSistemas) {
+        return [1, 2, 3].includes(line.research_line_id) || (!name.includes('psicolog') && !name.includes('salud') && !name.includes('comunitaria'));
+      }
+      return true;
+    });
+  }, [lines, targetProgramId, isPsicologia, isSistemas]);
+
+  const filteredSublines = useMemo(() => {
+    if (!form.lineId) return [];
+
+    return (sublines || []).filter(
+      s => String(s.research_line_id) === String(form.lineId)
+    );
+  }, [sublines, form.lineId]);
 
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -207,7 +235,7 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
                   <div className="epm-select-wrap">
                     <select value={form.lineId} onChange={e => setForm(p => ({ ...p, lineId: e.target.value, sublineId: '' }))}>
                       <option value="">— Selecciona —</option>
-                      {lines.map(l => <option key={l.research_line_id} value={l.research_line_id}>{l.name}</option>)}
+                      {filteredLines.map(l => <option key={l.research_line_id} value={l.research_line_id}>{l.name}</option>)}
                     </select>
                     <ChevronDown size={13} className="epm-chevron" />
                   </div>

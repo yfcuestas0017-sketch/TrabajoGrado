@@ -64,11 +64,22 @@ export default function ReportesPage() {
     setError('');
     try {
       const [allProjects, cats] = await Promise.all([
-        api.getProjects(),
-        api.getCatalogs(),
+        api.getProjects(userProgramId),
+        api.getCatalogs(userProgramId),
       ]);
 
-      setCatalogs(cats || {});
+      const filteredLines = userProgramId !== null
+        ? (cats?.lines || []).filter(l => !l.program_id || String(l.program_id) === String(userProgramId))
+        : (cats?.lines || []);
+      const filteredSublines = userProgramId !== null
+        ? (cats?.sublines || []).filter(s => filteredLines.some(l => l.research_line_id === s.research_line_id))
+        : (cats?.sublines || []);
+
+      setCatalogs({
+        ...(cats || {}),
+        lines: filteredLines,
+        sublines: filteredSublines,
+      });
 
       // Map raw projects — /api/projects already returns the correct shape
       let mapped = (allProjects || []).map(row => {

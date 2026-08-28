@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X, ChevronDown, Plus, Trash2, Save, Loader2 } from 'lucide-react';
 import api from '../../lib/api';
 import './CrearProyecto.css';
@@ -56,18 +56,50 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
   const [verifyingParticipant, setVerifyingParticipant] = useState(false);
   const [participantError, setParticipantError] = useState('');
 
-  const filteredSublines = form.lineId
-    ? sublines.filter(s => String(s.research_line_id) === String(form.lineId))
-    : sublines;
+  const userProgramId = user?.programId ?? user?.program_id ?? null;
+  const userProgramName = String(user?.programName ?? user?.program_name ?? '').toLowerCase();
+  const isPsicologia = String(userProgramId) === '2' || userProgramName.includes('psicolog');
+  const isSistemas = String(userProgramId) === '1' || userProgramName.includes('sistema');
+
+  const filteredLines = useMemo(() => {
+    const allLines = lines || [];
+    if (!allLines.length) return [];
+
+    return allLines.filter(line => {
+      // 1. Si la línea trae program_id explícito
+      if (line.program_id !== undefined && line.program_id !== null) {
+        return String(line.program_id) === String(userProgramId);
+      }
+      // 2. Si no trae program_id (fallback por ID o nombre del programa)
+      const name = (line.name || '').toLowerCase();
+      if (isPsicologia) {
+        return [4, 5, 6].includes(line.research_line_id) || name.includes('psicolog');
+      }
+      if (isSistemas) {
+        return [1, 2, 3].includes(line.research_line_id) || (!name.includes('psicolog') && !name.includes('salud') && !name.includes('comunitaria'));
+      }
+      return true;
+    });
+  }, [lines, userProgramId, isPsicologia, isSistemas]);
+
+  const filteredSublines = useMemo(() => {
+    if (!form.lineId) return [];
+
+    // Las sublíneas dependen directamente de la línea seleccionada.
+    return (sublines || []).filter(
+      subline =>
+        String(subline.research_line_id) === String(form.lineId)
+    );
+  }, [sublines, form.lineId]);
 
   useEffect(() => {
     if (!form.lineId) return;
     const generateCode = async () => {
       setIsGeneratingCode(true);
-      const line = lines.find(l => String(l.research_line_id) === String(form.lineId));
+      const line = filteredLines.find(l => String(l.research_line_id) === String(form.lineId));
       const prefix = generatePrefix(line?.name);
       try {
-        const existingProjects = await api.getProjects();
+        const existingProjects = await api.getProjects(userProgramId);
         const nums = (existingProjects || [])
           .map(p => parseInt((p.code || '').split('-')[1] || '0', 10))
           .filter(n => !isNaN(n));
@@ -80,7 +112,7 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
       }
     };
     generateCode();
-  }, [form.lineId, lines]);
+  }, [form.lineId, filteredLines, userProgramId]);
 
   const handleLineChange = (e) => {
     setForm(prev => ({ ...prev, lineId: e.target.value, sublineId: '' }));
@@ -200,7 +232,7 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
                     <div className="epm-select-wrap">
                       <select value={form.lineId} onChange={handleLineChange}>
                         <option value="">— Selecciona —</option>
-                        {lines.map(l => <option key={l.research_line_id} value={l.research_line_id}>{l.name}</option>)}
+                        {filteredLines.map(l => <option key={l.research_line_id} value={l.research_line_id}>{l.name}</option>)}
                       </select>
                       <ChevronDown size={13} className="epm-chevron" />
                     </div>

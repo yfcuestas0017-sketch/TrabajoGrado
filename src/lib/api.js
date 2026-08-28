@@ -35,7 +35,7 @@ export const api = {
   }),
 
   // Catalogs
-  getCatalogs: () => request('/catalogs'),
+  getCatalogs: (programId = null) => request(`/catalogs${programId ? `?program_id=${encodeURIComponent(programId)}` : ''}`),
 
   // Users
   checkCoauthor: (email) => request(`/users/check-coauthor?email=${encodeURIComponent(email)}`),

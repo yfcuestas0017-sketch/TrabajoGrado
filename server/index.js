@@ -196,12 +196,26 @@ app.post('/api/auth/register', async (req, res) => {
 // ─── CATALOGS ─────────────────────────────────────────────────────────────────
 
 app.get('/api/catalogs', async (req, res) => {
+  const { program_id, programId } = req.query;
+  const targetProgramId = (program_id || programId) ? parseInt(program_id || programId, 10) : null;
   try {
+    const lineQuery = targetProgramId
+      ? { text: 'SELECT research_line_id, name, description, program_id FROM public.research_lines WHERE program_id = $1 ORDER BY name', values: [targetProgramId] }
+      : { text: 'SELECT research_line_id, name, description, program_id FROM public.research_lines ORDER BY name' };
+
+    const sublineQuery = targetProgramId
+      ? { text: `SELECT rsl.research_subline_id, rsl.name, rsl.description, rsl.research_line_id
+                 FROM public.research_sublines rsl
+                 JOIN public.research_lines rl ON rl.research_line_id = rsl.research_line_id
+                 WHERE rl.program_id = $1
+                 ORDER BY rsl.name`, values: [targetProgramId] }
+      : { text: 'SELECT research_subline_id, name, description, research_line_id FROM public.research_sublines ORDER BY name' };
+
     const [statuses, modalities, lines, sublines, programs, faculties, semesters, curricula, roles, permissions] = await Promise.all([
       pool.query('SELECT status_id, name, description FROM public.statuses ORDER BY name'),
       pool.query('SELECT modality_id, name, description FROM public.modalities ORDER BY name'),
-      pool.query('SELECT research_line_id, name, description FROM public.research_lines ORDER BY name'),
-      pool.query('SELECT research_subline_id, name, description, research_line_id FROM public.research_sublines ORDER BY name'),
+      pool.query(lineQuery),
+      pool.query(sublineQuery),
       pool.query('SELECT program_id, name, faculty_id FROM public.programs ORDER BY name'),
       pool.query('SELECT faculty_id, name FROM public.faculties ORDER BY name'),
       pool.query('SELECT semester_id, semester_number FROM public.semesters ORDER BY semester_number'),
@@ -1545,7 +1559,7 @@ function normalizeChatbookRole(role) {
   return 'estudiante';
 }
 
-function detectOtherProgramQuery(normMessage, userProgramId, allPrograms) {
+function detectOtherProgramQuery(normMessage, userProgramId, allPrograms, allLines = [], allSublines = []) {
   if (!userProgramId || !allPrograms || allPrograms.length <= 1) return null;
   const currentProg = allPrograms.find(p => p.program_id === userProgramId);
   const currentProgNorm = currentProg ? normalizeChatbookText(currentProg.name) : '';
@@ -1558,7 +1572,7 @@ function detectOtherProgramQuery(normMessage, userProgramId, allPrograms) {
       return prog;
     }
 
-    const words = progNorm.split(/\s+/).filter(w => w.length >= 4 && !['para', 'sobre', 'ciencias', 'facultad', 'de', 'del', 'la', 'el', 'los', 'las'].includes(w));
+    const words = progNorm.split(/\s+/).filter(w => w.length >= 4 && !['para', 'sobre', 'ciencias', 'facultad', 'de', 'del', 'la', 'el', 'los', 'las', 'educacion'].includes(w));
     for (const word of words) {
       if (currentProgNorm.includes(word)) continue;
       const regex = new RegExp(`\\b${word}\\b`, 'i');
@@ -1567,6 +1581,36 @@ function detectOtherProgramQuery(normMessage, userProgramId, allPrograms) {
       }
     }
   }
+
+  // Cross-program check on research lines
+  const otherLines = allLines.filter(l => l.program_id && l.program_id !== userProgramId);
+  for (const line of otherLines) {
+    const lineNorm = normalizeChatbookText(line.name);
+    const lineWords = lineNorm.split(/\s+/).filter(w => w.length >= 4 && !['investigacion', 'sistemas', 'estudio', 'procesos', 'linea', 'sublinea', 'para', 'sobre', 'ciencias', 'facultad', 'de', 'del', 'la', 'el', 'los', 'las'].includes(w));
+    if (lineNorm.length >= 8 && normMessage.includes(lineNorm)) {
+      return allPrograms.find(p => p.program_id === line.program_id) || { name: 'otro programa' };
+    }
+    if (lineWords.length >= 2) {
+      const matchCount = lineWords.filter(w => new RegExp(`\\b${w}\\b`, 'i').test(normMessage)).length;
+      if (matchCount >= 2) {
+        return allPrograms.find(p => p.program_id === line.program_id) || { name: 'otro programa' };
+      }
+    }
+  }
+
+  // Cross-program check on research sublines
+  const otherSublines = allSublines.filter(sl => {
+    const parentLine = allLines.find(l => l.research_line_id === sl.research_line_id);
+    return parentLine && parentLine.program_id && parentLine.program_id !== userProgramId;
+  });
+  for (const sl of otherSublines) {
+    const slNorm = normalizeChatbookText(sl.name);
+    if (slNorm.length >= 6 && normMessage.includes(slNorm)) {
+      const parentLine = allLines.find(l => l.research_line_id === sl.research_line_id);
+      return allPrograms.find(p => p.program_id === parentLine.program_id) || { name: 'otro programa' };
+    }
+  }
+
   return null;
 }
 
@@ -1932,10 +1976,16 @@ app.post('/api/chatbook/query', async (req, res) => {
     // ──────────────────────────────────────────────────────────────────────────
     // 0. CONTROL CENTRALIZADO DE ACCESO POR PROGRAMA ACADÉMICO
     // ──────────────────────────────────────────────────────────────────────────
-    const allProgramsRes = await pool.query('SELECT program_id, name FROM public.programs');
+    const [allProgramsRes, allLinesRes, allSublinesRes] = await Promise.all([
+      pool.query('SELECT program_id, name FROM public.programs'),
+      pool.query('SELECT research_line_id, name, program_id FROM public.research_lines'),
+      pool.query('SELECT research_subline_id, name, research_line_id FROM public.research_sublines'),
+    ]);
     const allPrograms = allProgramsRes.rows;
+    const allLines = allLinesRes.rows;
+    const allSublines = allSublinesRes.rows;
 
-    const crossProgramAttempt = detectOtherProgramQuery(norm, programId, allPrograms);
+    const crossProgramAttempt = detectOtherProgramQuery(norm, programId, allPrograms, allLines, allSublines);
     if (crossProgramAttempt) {
       return res.json({
         message: 'La información solicitada pertenece a otro programa académico y no está disponible para su perfil.',
@@ -2361,23 +2411,10 @@ app.post('/api/chatbook/query', async (req, res) => {
                  COALESCE((SELECT json_agg(json_build_object('name', rsl.name, 'description', rsl.description))
                            FROM public.research_sublines rsl 
                            WHERE rsl.research_line_id = rl.research_line_id
-                             ${programId ? `AND EXISTS (
-                               SELECT 1 FROM public.projects p_sub 
-                               JOIN public.user_projects up_sub ON up_sub.project_id = p_sub.project_id 
-                               JOIN public.users u_sub ON u_sub.user_id = up_sub.user_id 
-                               WHERE p_sub.research_subline_id = rsl.research_subline_id 
-                                 AND u_sub.program_id = ${programId}
-                             )` : ''}
                           ), '[]'::json) as sublines
           FROM public.research_lines rl
           WHERE 1=1
-            ${programId ? `AND EXISTS (
-              SELECT 1 FROM public.projects p_line 
-              JOIN public.user_projects up_line ON up_line.project_id = p_line.project_id 
-              JOIN public.users u_line ON u_line.user_id = up_line.user_id 
-              WHERE p_line.research_line_id = rl.research_line_id 
-                AND u_line.program_id = ${programId}
-            )` : ''}
+            ${programId ? `AND rl.program_id = ${programId}` : ''}
           ORDER BY rl.name
         `);
         const lines = [`LÍNEAS DE INVESTIGACIÓN DISPONIBLES EN ${programName.toUpperCase()}:`, ''];
@@ -2589,13 +2626,7 @@ app.post('/api/chatbook/query', async (req, res) => {
           FROM public.research_sublines rsl
           JOIN public.research_lines rl ON rl.research_line_id = rsl.research_line_id
           WHERE 1=1
-            ${programId ? `AND EXISTS (
-              SELECT 1 FROM public.projects p_s 
-              JOIN public.user_projects up_s ON up_s.project_id = p_s.project_id 
-              JOIN public.users u_s ON u_s.user_id = up_s.user_id 
-              WHERE p_s.research_subline_id = rsl.research_subline_id 
-                AND u_s.program_id = ${programId}
-            )` : ''}
+            ${programId ? `AND rl.program_id = ${programId}` : ''}
           ORDER BY rl.name, rsl.name
         `);
         const grouped = {};
@@ -2918,23 +2949,10 @@ app.post('/api/chatbook/query', async (req, res) => {
                  COALESCE((SELECT json_agg(json_build_object('name', rsl.name, 'description', rsl.description))
                            FROM public.research_sublines rsl 
                            WHERE rsl.research_line_id = rl.research_line_id
-                             ${programId ? `AND EXISTS (
-                               SELECT 1 FROM public.projects p_sub 
-                               JOIN public.user_projects up_sub ON up_sub.project_id = p_sub.project_id 
-                               JOIN public.users u_sub ON u_sub.user_id = up_sub.user_id 
-                               WHERE p_sub.research_subline_id = rsl.research_subline_id 
-                                 AND u_sub.program_id = ${programId}
-                             )` : ''}
                           ), '[]'::json) as sublines
           FROM public.research_lines rl
           WHERE 1=1
-            ${programId ? `AND EXISTS (
-              SELECT 1 FROM public.projects p_line 
-              JOIN public.user_projects up_line ON up_line.project_id = p_line.project_id 
-              JOIN public.users u_line ON u_line.user_id = up_line.user_id 
-              WHERE p_line.research_line_id = rl.research_line_id 
-                AND u_line.program_id = ${programId}
-            )` : ''}
+            ${programId ? `AND rl.program_id = ${programId}` : ''}
           ORDER BY rl.name
         `);
         const lines = [`LÍNEAS DE INVESTIGACIÓN REGISTRADAS EN ${programName.toUpperCase()} (${linesRes.rows.length}):`, ''];
@@ -2954,13 +2972,7 @@ app.post('/api/chatbook/query', async (req, res) => {
           FROM public.research_sublines rsl
           JOIN public.research_lines rl ON rl.research_line_id = rsl.research_line_id
           WHERE 1=1
-            ${programId ? `AND EXISTS (
-              SELECT 1 FROM public.projects p_s 
-              JOIN public.user_projects up_s ON up_s.project_id = p_s.project_id 
-              JOIN public.users u_s ON u_s.user_id = up_s.user_id 
-              WHERE p_s.research_subline_id = rsl.research_subline_id 
-                AND u_s.program_id = ${programId}
-            )` : ''}
+            ${programId ? `AND rl.program_id = ${programId}` : ''}
           ORDER BY rl.name, rsl.name
         `);
         const grouped = {};
@@ -2988,6 +3000,8 @@ app.post('/api/chatbook/query', async (req, res) => {
           SELECT rl.name as line_name, COUNT(p.project_id)::int as count
           FROM public.research_lines rl
           JOIN public.projects p ON p.research_line_id = rl.research_line_id ${programProjectScope}
+          WHERE 1=1
+            ${programId ? `AND rl.program_id = ${programId}` : ''}
           GROUP BY rl.name
           HAVING COUNT(p.project_id) > 0
           ORDER BY count DESC
@@ -3008,6 +3022,7 @@ app.post('/api/chatbook/query', async (req, res) => {
           JOIN public.user_roles ur ON ur.user_id = u.user_id
           JOIN public.roles r ON r.role_id = ur.role_id
           WHERE (LOWER(r.name) LIKE '%docent%') ${programProjectScope}
+            ${programId ? `AND rl.program_id = ${programId}` : ''}
           GROUP BY rl.name, u.full_name, u.email
           ORDER BY rl.name, u.full_name
         `);
@@ -3037,6 +3052,7 @@ app.post('/api/chatbook/query', async (req, res) => {
           FROM public.projects p
           JOIN public.research_lines rl ON rl.research_line_id = p.research_line_id
           WHERE 1=1 ${programProjectScope}
+            ${programId ? `AND rl.program_id = ${programId}` : ''}
           ORDER BY rl.name, p.code
         `);
         const grouped = {};
@@ -3211,7 +3227,7 @@ app.get('/api/analytics', async (req, res) => {
     const [projectsRes, statusesRes, linesRes, sublinesRes, programsRes, facultiesRes, userProjectsRes, studentsRes] = await Promise.all([
       pool.query('SELECT project_id, title, code, created_at, status_id, research_line_id, research_subline_id, modality_id FROM public.projects ORDER BY created_at DESC'),
       pool.query('SELECT status_id, name FROM public.statuses ORDER BY name'),
-      pool.query('SELECT research_line_id, name FROM public.research_lines ORDER BY name'),
+      pool.query('SELECT research_line_id, name, program_id FROM public.research_lines ORDER BY name'),
       pool.query('SELECT research_subline_id, name, research_line_id FROM public.research_sublines ORDER BY name'),
       pool.query('SELECT program_id, name, faculty_id FROM public.programs ORDER BY name'),
       pool.query('SELECT faculty_id, name FROM public.faculties ORDER BY name'),
@@ -3235,6 +3251,8 @@ app.get('/api/analytics', async (req, res) => {
     }));
     let projects = projectsRes.rows;
     let students = studentsRes.rows.map(s => ({ ...s, user_id: String(s.user_id) }));
+    let lines = linesRes.rows;
+    let sublines = sublinesRes.rows;
 
     if (targetProgramId) {
       const authorProjectIds = new Set(
@@ -3245,13 +3263,15 @@ app.get('/api/analytics', async (req, res) => {
       projects = projects.filter(p => authorProjectIds.has(p.project_id));
       userProjects = userProjects.filter(up => String(up.program_id) === String(targetProgramId) && authorProjectIds.has(up.project_id));
       students = students.filter(s => String(s.program_id) === String(targetProgramId));
+      lines = lines.filter(l => !l.program_id || String(l.program_id) === String(targetProgramId));
+      sublines = sublines.filter(sl => lines.some(l => l.research_line_id === sl.research_line_id));
     }
 
     res.json({
       projects,
       statuses: statusesRes.rows,
-      lines: linesRes.rows,
-      sublines: sublinesRes.rows,
+      lines,
+      sublines,
       programs: targetProgramId ? programsRes.rows.filter(p => String(p.program_id) === String(targetProgramId)) : programsRes.rows,
       faculties: facultiesRes.rows,
       userProjects,
