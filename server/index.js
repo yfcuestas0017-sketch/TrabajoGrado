@@ -211,7 +211,7 @@ app.get('/api/catalogs', async (req, res) => {
                  ORDER BY rsl.name`, values: [targetProgramId] }
       : { text: 'SELECT research_subline_id, name, description, research_line_id FROM public.research_sublines ORDER BY name' };
 
-    const [statuses, modalities, lines, sublines, programs, faculties, semesters, curricula, roles, permissions] = await Promise.all([
+    const [statuses, modalities, lines, sublines, programs, faculties, semesters, curricula, roles, permissions, degreeOptions] = await Promise.all([
       pool.query('SELECT status_id, name, description FROM public.statuses ORDER BY name'),
       pool.query('SELECT modality_id, name, description FROM public.modalities ORDER BY name'),
       pool.query(lineQuery),
@@ -222,6 +222,7 @@ app.get('/api/catalogs', async (req, res) => {
       pool.query('SELECT curriculum_id, program_id, version FROM public.academic_curricula ORDER BY version'),
       pool.query('SELECT role_id, name, description FROM public.roles ORDER BY role_id'),
       pool.query('SELECT permission_id, name, description FROM public.permissions ORDER BY permission_id'),
+      pool.query('SELECT degree_option_id, name, description FROM public.degree_options ORDER BY degree_option_id'),
     ]);
 
     res.json({
@@ -235,10 +236,23 @@ app.get('/api/catalogs', async (req, res) => {
       curricula: curricula.rows,
       roles: roles.rows,
       permissions: permissions.rows,
+      degreeOptions: degreeOptions.rows,
     });
   } catch (err) {
     console.error('Catalogs error:', err);
     res.status(500).json({ error: 'Error al cargar catálogos.' });
+  }
+});
+
+// ─── DEGREE OPTIONS ───────────────────────────────────────────────────────────
+
+app.get('/api/degree-options', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT degree_option_id, name, description FROM public.degree_options ORDER BY degree_option_id');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Degree options error:', err);
+    res.status(500).json({ error: 'Error al cargar opciones de grado.' });
   }
 });
 
@@ -309,9 +323,10 @@ app.get('/api/students/:userId/research-process', async (req, res) => {
     const phase = semesterNumber === 8 ? 'I' : semesterNumber === 9 ? 'II' : semesterNumber === 10 ? 'III' : null;
     const projectRes = await pool.query(
       `SELECT p.project_id, p.title, p.code, p.created_at, p.finished_at, p.letter_link,
-              p.status_id, p.modality_id, p.research_line_id, p.research_subline_id,
+              p.status_id, p.modality_id, p.research_line_id, p.research_subline_id, p.degree_option_id,
               s.name AS status_name, m.name AS modality_name,
               rl.name AS line_name, rsl.name AS subline_name,
+              dopt.name AS degree_option_name,
               COALESCE((SELECT json_agg(json_build_object('id', u.user_id, 'name', u.full_name, 'email', u.email, 'role', COALESCE(up2.project_role, 'autor')) ORDER BY u.full_name)
                         FROM public.user_projects up2 JOIN public.users u ON u.user_id = up2.user_id
                         WHERE up2.project_id = p.project_id), '[]'::json) AS participants
@@ -321,6 +336,7 @@ app.get('/api/students/:userId/research-process', async (req, res) => {
        LEFT JOIN public.modalities m ON m.modality_id = p.modality_id
        LEFT JOIN public.research_lines rl ON rl.research_line_id = p.research_line_id
        LEFT JOIN public.research_sublines rsl ON rsl.research_subline_id = p.research_subline_id
+       LEFT JOIN public.degree_options dopt ON dopt.degree_option_id = p.degree_option_id
        WHERE up.user_id::text = $1
        ORDER BY CASE WHEN ${activeProjectPredicate()} THEN 0 ELSE 1 END, p.created_at DESC
        LIMIT 1`,
@@ -338,6 +354,8 @@ app.get('/api/students/:userId/research-process', async (req, res) => {
       modality: row.modality_name,
       line: row.line_name,
       subline: row.subline_name,
+      degreeOptionId: row.degree_option_id,
+      degreeOptionName: row.degree_option_name || null,
       participants: row.participants || [],
     } : null;
 
@@ -639,15 +657,18 @@ app.get('/api/projects', async (req, res) => {
         p.modality_id,
         p.research_line_id,
         p.research_subline_id,
+        p.degree_option_id,
         s.name as status_name,
         m.name as modality_name,
         rl.name as line_name,
-        rsl.name as subline_name
+        rsl.name as subline_name,
+        dopt.name as degree_option_name
       FROM public.projects p
       LEFT JOIN public.statuses s ON p.status_id = s.status_id
       LEFT JOIN public.modalities m ON p.modality_id = m.modality_id
       LEFT JOIN public.research_lines rl ON p.research_line_id = rl.research_line_id
       LEFT JOIN public.research_sublines rsl ON p.research_subline_id = rsl.research_subline_id
+      LEFT JOIN public.degree_options dopt ON p.degree_option_id = dopt.degree_option_id
       ORDER BY p.created_at DESC;
     `;
     const projectsRes = await pool.query(projectsQuery);
@@ -722,6 +743,8 @@ app.get('/api/projects', async (req, res) => {
         line: p.line_name,
         sublineId: p.research_subline_id,
         subline: p.subline_name,
+        degreeOptionId: p.degree_option_id,
+        degreeOptionName: p.degree_option_name || null,
         programId: projectProgramId,
         programName,
         facultyName,
@@ -768,7 +791,8 @@ app.get('/api/projects', async (req, res) => {
 
 // Create Project
 app.post('/api/projects', async (req, res) => {
-  const { title, code, statusId, modalityId, lineId, sublineId, letterLink, creatorUserId, coauthors } = req.body;
+  const { title, code, statusId, modalityId, lineId, sublineId, letterLink, degreeOptionId, degree_option_id, creatorUserId, coauthors } = req.body;
+  const finalDegreeOptionId = (degreeOptionId !== undefined ? degreeOptionId : degree_option_id) ? parseInt(degreeOptionId || degree_option_id, 10) : null;
 
   if (!title) {
     return res.status(400).json({ error: 'El título del proyecto es obligatorio.' });
@@ -839,9 +863,9 @@ app.post('/api/projects', async (req, res) => {
     // 1. Insert Project
     const insertProjectQuery = `
       INSERT INTO public.projects 
-        (title, code, status_id, modality_id, research_line_id, research_subline_id, letter_link)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING project_id, title, code, created_at, status_id, modality_id, research_line_id, research_subline_id, letter_link;
+        (title, code, status_id, modality_id, research_line_id, research_subline_id, letter_link, degree_option_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING project_id, title, code, created_at, status_id, modality_id, research_line_id, research_subline_id, letter_link, degree_option_id;
     `;
     const projRes = await client.query(insertProjectQuery, [
       title.trim(),
@@ -851,6 +875,7 @@ app.post('/api/projects', async (req, res) => {
       lineId ? parseInt(lineId, 10) : null,
       sublineId ? parseInt(sublineId, 10) : null,
       letterLink ? letterLink.trim() : null,
+      finalDegreeOptionId,
     ]);
 
     const newProj = projRes.rows[0];
@@ -905,7 +930,7 @@ app.post('/api/projects', async (req, res) => {
 // Update Project
 app.put('/api/projects/:id', async (req, res) => {
   const projectId = parseInt(req.params.id, 10);
-  const { title, code, statusId, modalityId, lineId, sublineId, letterLink, userId, actorUserId } = req.body;
+  const { title, code, statusId, modalityId, lineId, sublineId, letterLink, degreeOptionId, degree_option_id, userId, actorUserId } = req.body;
   const actingUserId = userId || actorUserId || null;
 
   if (isNaN(projectId)) return res.status(400).json({ error: 'ID de proyecto inválido.' });
@@ -915,12 +940,13 @@ app.put('/api/projects/:id', async (req, res) => {
     await client.query('BEGIN');
 
     const currentRes = await client.query(`
-      SELECT p.*, s.name as status_name, m.name as modality_name, rl.name as line_name, rsl.name as subline_name
+      SELECT p.*, s.name as status_name, m.name as modality_name, rl.name as line_name, rsl.name as subline_name, dopt.name as degree_option_name
       FROM public.projects p
       LEFT JOIN public.statuses s ON p.status_id = s.status_id
       LEFT JOIN public.modalities m ON p.modality_id = m.modality_id
       LEFT JOIN public.research_lines rl ON p.research_line_id = rl.research_line_id
       LEFT JOIN public.research_sublines rsl ON p.research_subline_id = rsl.research_subline_id
+      LEFT JOIN public.degree_options dopt ON p.degree_option_id = dopt.degree_option_id
       WHERE p.project_id = $1
     `, [projectId]);
 
@@ -934,6 +960,8 @@ app.put('/api/projects/:id', async (req, res) => {
     const finalModalityId = modalityId !== undefined ? (modalityId ? parseInt(modalityId, 10) : null) : oldProj.modality_id;
     const finalLineId = lineId !== undefined ? (lineId ? parseInt(lineId, 10) : null) : oldProj.research_line_id;
     const finalSublineId = sublineId !== undefined ? (sublineId ? parseInt(sublineId, 10) : null) : oldProj.research_subline_id;
+    const targetDegOpt = degreeOptionId !== undefined ? degreeOptionId : degree_option_id;
+    const finalDegreeOptionId = targetDegOpt !== undefined ? (targetDegOpt ? parseInt(targetDegOpt, 10) : null) : oldProj.degree_option_id;
 
     const updateQuery = `
       UPDATE public.projects
@@ -943,8 +971,9 @@ app.put('/api/projects/:id', async (req, res) => {
           modality_id = $4,
           research_line_id = $5,
           research_subline_id = $6,
-          letter_link = $7
-      WHERE project_id = $8
+          letter_link = $7,
+          degree_option_id = $8
+      WHERE project_id = $9
       RETURNING *;
     `;
     const updateRes = await client.query(updateQuery, [
@@ -955,6 +984,7 @@ app.put('/api/projects/:id', async (req, res) => {
       finalLineId,
       finalSublineId,
       letterLink !== undefined ? (letterLink ? letterLink.trim() : null) : oldProj.letter_link,
+      finalDegreeOptionId,
       projectId,
     ]);
 
@@ -1005,6 +1035,15 @@ app.put('/api/projects/:id', async (req, res) => {
 
     if (letterLink !== undefined && (letterLink || '').trim() !== (oldProj.letter_link || '').trim()) {
       await logHistory(`Actualización de enlace de carta de aprobación o documento`, 'letter_link', oldProj.letter_link || 'Sin enlace', letterLink ? letterLink.trim() : 'Sin enlace');
+    }
+
+    if (targetDegOpt !== undefined && finalDegreeOptionId !== oldProj.degree_option_id) {
+      let newDegName = 'Opción de grado pendiente';
+      if (finalDegreeOptionId) {
+        const dRes = await client.query('SELECT name FROM public.degree_options WHERE degree_option_id = $1', [finalDegreeOptionId]);
+        newDegName = dRes.rows[0]?.name || String(finalDegreeOptionId);
+      }
+      await logHistory(`Actualización de opción de grado: ${oldProj.degree_option_name || 'Opción de grado pendiente'} → ${newDegName}`, 'degree_option_id', oldProj.degree_option_name || 'Pendiente', newDegName);
     }
 
     await client.query('COMMIT');

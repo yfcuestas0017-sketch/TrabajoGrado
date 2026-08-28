@@ -35,6 +35,7 @@ export function ProyectosPage() {
   const [modalities, setModalities] = useState([]);
   const [lines, setLines] = useState([]);
   const [sublines, setSublines] = useState([]);
+  const [degreeOptions, setDegreeOptions] = useState([]);
   const [academicSemesters, setAcademicSemesters] = useState([]);
   const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -203,6 +204,7 @@ export function ProyectosPage() {
       setModalities(catalogs.modalities || []);
       setLines(progLines);
       setSublines(progSublines);
+      setDegreeOptions(catalogs.degreeOptions || []);
       setAcademicSemesters(catalogs.semesters || []);
 
       let userProjects = allProjects || [];
@@ -237,6 +239,8 @@ export function ProyectosPage() {
           lineId: row.lineId || '',
           subline: row.subline || 'Sin sublínea',
           sublineId: row.sublineId || '',
+          degreeOptionId: row.degreeOptionId ?? row.degree_option_id ?? null,
+          degreeOptionName: row.degreeOptionName ?? row.degree_option_name ?? null,
           year,
           semesterNumber: row.semesterNumber ?? null,
           authorsArray: authorsArray.length > 0 ? authorsArray : ['Sin autores'],
@@ -684,6 +688,7 @@ export function ProyectosPage() {
                   <strong>{studentProcess.project.title}</strong>
                   <span>{studentProcess.project.code || 'Sin código'} · {studentProcess.project.status || 'Sin estado'}</span>
                   <span>Línea: {studentProcess.project.line || 'No registrada'}</span>
+                  <span>Opción de grado: <strong>{studentProcess.project.degreeOptionName || 'Opción de grado pendiente'}</strong></span>
                   <span>Integrantes: {studentProcess.project.participants?.map((person) => person.name).join(', ') || 'No registrados'}</span>
                   <div className="student-process-actions">
                     {studentPhase !== 'I' && <button type="button" onClick={() => openStudentAction('progress')}>Registrar avance</button>}
@@ -1094,6 +1099,10 @@ export function ProyectosPage() {
                     <span className="modal-info-val">{detailModal.subline || '—'}</span>
                   </div>
                   <div className="modal-info-item">
+                    <span className="modal-info-key">Opción de grado</span>
+                    <span className="modal-info-val">{detailModal.degreeOptionName || 'Opción de grado pendiente'}</span>
+                  </div>
+                  <div className="modal-info-item">
                     <span className="modal-info-key">Autores</span>
                     <span className="modal-info-val">
                       {detailModal.authorsArray?.map((author, i) => (
@@ -1252,6 +1261,7 @@ export function ProyectosPage() {
           modalities={modalities}
           lines={lines}
           sublines={sublines}
+          degreeOptions={degreeOptions}
           user={user}
           onClose={() => setEditModal(null)}
           onOpenHistory={() => {
@@ -1272,6 +1282,7 @@ export function ProyectosPage() {
           modalities={modalities}
           lines={lines}
           sublines={sublines}
+          degreeOptions={degreeOptions}
           user={user}
           onClose={() => setShowCrearModal(false)}
           onSaved={() => { setShowCrearModal(false); loadData(); }}

@@ -36,6 +36,7 @@ export const api = {
 
   // Catalogs
   getCatalogs: (programId = null) => request(`/catalogs${programId ? `?program_id=${encodeURIComponent(programId)}` : ''}`),
+  getDegreeOptions: () => request('/degree-options'),
 
   // Users
   checkCoauthor: (email) => request(`/users/check-coauthor?email=${encodeURIComponent(email)}`),

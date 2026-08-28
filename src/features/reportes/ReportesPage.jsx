@@ -701,6 +701,7 @@ export default function ReportesPage() {
                     <div className="info-list">
                       <div className="info-item"><span className="info-label">Línea de investigación:</span><span className="info-val">{selectedProjectDetail.line}</span></div>
                       <div className="info-item"><span className="info-label">Sublínea:</span><span className="info-val">{selectedProjectDetail.subline}</span></div>
+                      <div className="info-item"><span className="info-label">Opción de grado:</span><span className="info-val">{selectedProjectDetail.degreeOptionName || 'Opción de grado pendiente'}</span></div>
                       <div className="info-item"><span className="info-label">Periodo académico:</span><span className="info-val">{selectedProjectDetail.academicPeriod}</span></div>
                       <div className="info-item">
                         <span className="info-label">Carta de aprobación:</span>

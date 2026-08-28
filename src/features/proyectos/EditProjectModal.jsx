@@ -27,7 +27,7 @@ function Avatar({ name, size = 30 }) {
   );
 }
 
-export default function EditProjectModal({ project, statuses, modalities, lines, sublines, user, onClose, onSaved, onOpenHistory }) {
+export default function EditProjectModal({ project, statuses, modalities, lines, sublines, degreeOptions = [], user, onClose, onSaved, onOpenHistory }) {
   const isAdmin = user?.role?.toLowerCase() === 'administrador';
 
   const [form, setForm] = useState({
@@ -37,6 +37,7 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
     modalityId: project.modalityId || '',
     lineId: project.lineId || '',
     sublineId: project.sublineId || '',
+    degreeOptionId: project.degreeOptionId ?? project.degree_option_id ?? '',
     letterLink: project.letterLink || '',
   });
   const [saving, setSaving] = useState(false);
@@ -155,6 +156,7 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
         modalityId: form.modalityId ? Number(form.modalityId) : null,
         lineId: form.lineId ? Number(form.lineId) : null,
         sublineId: form.sublineId ? Number(form.sublineId) : null,
+        degreeOptionId: form.degreeOptionId ? Number(form.degreeOptionId) : null,
         letterLink: form.letterLink.trim() || null,
       };
 
@@ -233,6 +235,37 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
                     </select>
                     <ChevronDown size={13} className="epm-chevron" />
                   </div>
+                </div>
+
+                <div className="epm-field">
+                  <label>Opción de grado</label>
+                  {isAdmin ? (
+                    <div className="epm-select-wrap">
+                      <select
+                        value={form.degreeOptionId || ''}
+                        onChange={e => setForm(p => ({ ...p, degreeOptionId: e.target.value }))}
+                      >
+                        <option value="">— Seleccione una opción —</option>
+                        {(degreeOptions || []).map(opt => (
+                          <option key={opt.degree_option_id} value={opt.degree_option_id}>
+                            {opt.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={13} className="epm-chevron" />
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={
+                        (degreeOptions || []).find(opt => String(opt.degree_option_id) === String(form.degreeOptionId))?.name
+                        || project.degreeOptionName
+                        || 'Opción de grado pendiente'
+                      }
+                      readOnly
+                      disabled
+                    />
+                  )}
                 </div>
 
                 <div className="epm-field">

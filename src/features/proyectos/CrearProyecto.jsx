@@ -33,13 +33,16 @@ function Avatar({ name, size = 32 }) {
   );
 }
 
-export default function CreateProjectModal({ statuses, modalities, lines, sublines, onClose, onSaved, user }) {
+export default function CreateProjectModal({ statuses, modalities, lines, sublines, degreeOptions = [], onClose, onSaved, user }) {
+  const isAdmin = user?.role?.toLowerCase() === 'administrador';
+
   const [form, setForm] = useState({
     title: '',
     code: '',
     modalityId: '',
     lineId: '',
     sublineId: '',
+    degreeOptionId: '',
     letterLink: '',
     period: '',
     objectives: '',
@@ -172,6 +175,7 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
         modalityId: Number(form.modalityId) || null,
         lineId: form.lineId ? Number(form.lineId) : null,
         sublineId: form.sublineId ? Number(form.sublineId) : null,
+        degreeOptionId: form.degreeOptionId ? Number(form.degreeOptionId) : null,
         letterLink: form.letterLink.trim() || null,
         creatorUserId: user?.id,
         coauthors: pendingParticipants,
@@ -266,6 +270,20 @@ export default function CreateProjectModal({ statuses, modalities, lines, sublin
                       <ChevronDown size={13} className="epm-chevron" />
                     </div>
                   </div>
+                  {isAdmin && (
+                    <div className="epm-field">
+                      <label>Opción de grado</label>
+                      <div className="epm-select-wrap">
+                        <select value={form.degreeOptionId} onChange={e => setForm(p => ({ ...p, degreeOptionId: e.target.value }))}>
+                          <option value="">— Selecciona —</option>
+                          {(degreeOptions || []).map(opt => (
+                            <option key={opt.degree_option_id} value={opt.degree_option_id}>{opt.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} className="epm-chevron" />
+                      </div>
+                    </div>
+                  )}
                   <div className="epm-field epm-span2">
                     <label>Carta / link</label>
                     <input
