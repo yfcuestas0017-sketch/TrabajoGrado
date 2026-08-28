@@ -879,9 +879,9 @@ app.post('/api/projects', async (req, res) => {
 
     // 4. Add initial history entry
     const historyRes = await client.query(
-      `INSERT INTO public.histories (description, change_type)
-       VALUES ($1, 'CREATE') RETURNING history_id`,
-      ['Creación inicial del proyecto']
+      `INSERT INTO public.histories (description, change_type, user_id)
+       VALUES ($1, 'CREATE', $2) RETURNING history_id`,
+      ['Creación inicial del proyecto', creatorUserId ? String(creatorUserId) : null]
     );
     const historyId = historyRes.rows[0].history_id;
 
@@ -905,7 +905,8 @@ app.post('/api/projects', async (req, res) => {
 // Update Project
 app.put('/api/projects/:id', async (req, res) => {
   const projectId = parseInt(req.params.id, 10);
-  const { title, code, statusId, modalityId, lineId, sublineId, letterLink } = req.body;
+  const { title, code, statusId, modalityId, lineId, sublineId, letterLink, userId, actorUserId } = req.body;
+  const actingUserId = userId || actorUserId || null;
 
   if (isNaN(projectId)) return res.status(400).json({ error: 'ID de proyecto inválido.' });
 
@@ -929,6 +930,11 @@ app.put('/api/projects/:id', async (req, res) => {
     }
     const oldProj = currentRes.rows[0];
 
+    const finalStatusId = statusId !== undefined ? (statusId ? parseInt(statusId, 10) : null) : oldProj.status_id;
+    const finalModalityId = modalityId !== undefined ? (modalityId ? parseInt(modalityId, 10) : null) : oldProj.modality_id;
+    const finalLineId = lineId !== undefined ? (lineId ? parseInt(lineId, 10) : null) : oldProj.research_line_id;
+    const finalSublineId = sublineId !== undefined ? (sublineId ? parseInt(sublineId, 10) : null) : oldProj.research_subline_id;
+
     const updateQuery = `
       UPDATE public.projects
       SET title = $1,
@@ -944,10 +950,10 @@ app.put('/api/projects/:id', async (req, res) => {
     const updateRes = await client.query(updateQuery, [
       title ? title.trim() : oldProj.title,
       code !== undefined ? (code ? code.trim() : null) : oldProj.code,
-      statusId ? parseInt(statusId, 10) : null,
-      modalityId ? parseInt(modalityId, 10) : null,
-      lineId ? parseInt(lineId, 10) : null,
-      sublineId ? parseInt(sublineId, 10) : null,
+      finalStatusId,
+      finalModalityId,
+      finalLineId,
+      finalSublineId,
       letterLink !== undefined ? (letterLink ? letterLink.trim() : null) : oldProj.letter_link,
       projectId,
     ]);
@@ -955,20 +961,15 @@ app.put('/api/projects/:id', async (req, res) => {
     // Helper to log history
     const logHistory = async (desc, field, oldVal, newVal) => {
       const histRes = await client.query(
-        `INSERT INTO public.histories (description, modified_field, old_value, new_value, change_type)
-         VALUES ($1, $2, $3, $4, 'UPDATE') RETURNING history_id`,
-        [desc, field, oldVal ? String(oldVal) : null, newVal ? String(newVal) : null]
+        `INSERT INTO public.histories (description, modified_field, old_value, new_value, change_type, user_id)
+         VALUES ($1, $2, $3, $4, 'UPDATE', $5) RETURNING history_id`,
+        [desc, field, oldVal ? String(oldVal) : null, newVal ? String(newVal) : null, actingUserId ? String(actingUserId) : null]
       );
       await client.query(
         'INSERT INTO public.project_histories (project_id, history_id) VALUES ($1, $2)',
         [projectId, histRes.rows[0].history_id]
       );
     };
-
-    const newStatusId = statusId ? parseInt(statusId, 10) : null;
-    const newModalityId = modalityId ? parseInt(modalityId, 10) : null;
-    const newLineId = lineId ? parseInt(lineId, 10) : null;
-    const newSublineId = sublineId ? parseInt(sublineId, 10) : null;
 
     if (title && title.trim() !== (oldProj.title || '').trim()) {
       await logHistory(`Modificación de título: "${oldProj.title}" → "${title.trim()}"`, 'title', oldProj.title, title.trim());
@@ -978,27 +979,27 @@ app.put('/api/projects/:id', async (req, res) => {
       await logHistory(`Modificación de código: "${oldProj.code || 'Sin código'}" → "${code ? code.trim() : 'Sin código'}"`, 'code', oldProj.code || 'Sin código', code ? code.trim() : 'Sin código');
     }
 
-    if (newStatusId && newStatusId !== oldProj.status_id) {
-      const sRes = await client.query('SELECT name FROM public.statuses WHERE status_id = $1', [newStatusId]);
-      const newStatusName = sRes.rows[0]?.name || String(newStatusId);
+    if (statusId !== undefined && finalStatusId !== oldProj.status_id) {
+      const sRes = await client.query('SELECT name FROM public.statuses WHERE status_id = $1', [finalStatusId]);
+      const newStatusName = sRes.rows[0]?.name || String(finalStatusId);
       await logHistory(`Actualización de estado: ${oldProj.status_name || 'Sin estado'} → ${newStatusName}`, 'status_id', oldProj.status_name, newStatusName);
     }
 
-    if (newModalityId && newModalityId !== oldProj.modality_id) {
-      const mRes = await client.query('SELECT name FROM public.modalities WHERE modality_id = $1', [newModalityId]);
-      const newModName = mRes.rows[0]?.name || String(newModalityId);
+    if (modalityId !== undefined && finalModalityId !== oldProj.modality_id) {
+      const mRes = await client.query('SELECT name FROM public.modalities WHERE modality_id = $1', [finalModalityId]);
+      const newModName = mRes.rows[0]?.name || String(finalModalityId);
       await logHistory(`Actualización de modalidad: ${oldProj.modality_name || 'Sin modalidad'} → ${newModName}`, 'modality_id', oldProj.modality_name, newModName);
     }
 
-    if (newLineId && newLineId !== oldProj.research_line_id) {
-      const lRes = await client.query('SELECT name FROM public.research_lines WHERE research_line_id = $1', [newLineId]);
-      const newLineName = lRes.rows[0]?.name || String(newLineId);
+    if (lineId !== undefined && finalLineId !== oldProj.research_line_id) {
+      const lRes = await client.query('SELECT name FROM public.research_lines WHERE research_line_id = $1', [finalLineId]);
+      const newLineName = lRes.rows[0]?.name || String(finalLineId);
       await logHistory(`Actualización de línea de investigación: ${oldProj.line_name || 'Sin línea'} → ${newLineName}`, 'research_line_id', oldProj.line_name, newLineName);
     }
 
-    if (newSublineId && newSublineId !== oldProj.research_subline_id) {
-      const slRes = await client.query('SELECT name FROM public.research_sublines WHERE research_subline_id = $1', [newSublineId]);
-      const newSublineName = slRes.rows[0]?.name || String(newSublineId);
+    if (sublineId !== undefined && finalSublineId !== oldProj.research_subline_id) {
+      const slRes = await client.query('SELECT name FROM public.research_sublines WHERE research_subline_id = $1', [finalSublineId]);
+      const newSublineName = slRes.rows[0]?.name || String(finalSublineId);
       await logHistory(`Actualización de sublínea de investigación: ${oldProj.subline_name || 'Sin sublínea'} → ${newSublineName}`, 'research_subline_id', oldProj.subline_name, newSublineName);
     }
 
@@ -1021,7 +1022,8 @@ app.put('/api/projects/:id', async (req, res) => {
 // Update Project Team (authors, coauthors, advisors, jury) — Admin only feature on the frontend
 app.put('/api/projects/:id/participants', async (req, res) => {
   const projectId = parseInt(req.params.id, 10);
-  const { participants } = req.body;
+  const { participants, userId, actorUserId } = req.body;
+  const actingUserId = userId || actorUserId || null;
 
   if (isNaN(projectId)) return res.status(400).json({ error: 'ID de proyecto inválido.' });
   if (!Array.isArray(participants)) return res.status(400).json({ error: 'La lista de participantes es inválida.' });
@@ -1058,8 +1060,9 @@ app.put('/api/projects/:id/participants', async (req, res) => {
     }
 
     const historyRes = await client.query(
-      `INSERT INTO public.histories (description, change_type)
-       VALUES ('Actualización del equipo del proyecto (autores, asesor, jurados)', 'UPDATE') RETURNING history_id`,
+      `INSERT INTO public.histories (description, change_type, user_id)
+       VALUES ('Actualización del equipo del proyecto (autores, asesor, jurados)', 'UPDATE', $1) RETURNING history_id`,
+      [actingUserId ? String(actingUserId) : null]
     );
     await client.query(
       'INSERT INTO public.project_histories (project_id, history_id) VALUES ($1, $2)',
@@ -1123,14 +1126,45 @@ app.get('/api/projects/:id/history', async (req, res) => {
 
   try {
     const query = `
-      SELECT h.history_id, h.description, h.modified_field, h.old_value, h.new_value, h.change_type, h.changed_at
+      SELECT 
+        h.history_id, 
+        h.description, 
+        h.modified_field, 
+        h.old_value, 
+        h.new_value, 
+        h.change_type, 
+        h.changed_at,
+        h.user_id,
+        u.full_name as user_name,
+        u.email as user_email,
+        COALESCE(r.name, 'Usuario') as user_role,
+        COALESCE(pr.name, 'Sin programa') as user_program
       FROM public.project_histories ph
       JOIN public.histories h ON ph.history_id = h.history_id
+      LEFT JOIN public.users u ON h.user_id::text = u.user_id::text
+      LEFT JOIN public.user_roles ur ON u.user_id = ur.user_id
+      LEFT JOIN public.roles r ON ur.role_id = r.role_id
+      LEFT JOIN public.programs pr ON u.program_id = pr.program_id
       WHERE ph.project_id = $1
       ORDER BY h.changed_at DESC;
     `;
     const result = await pool.query(query, [projectId]);
-    res.json(result.rows);
+
+    // Filtrar filas duplicadas generadas automáticamente por disparadores de BD sin usuario registrado
+    const cleanRows = result.rows.filter((row, idx, arr) => {
+      if (!row.user_id) {
+        const isGenericTrigger = ['Title modification', 'Status update', 'Proyecto actualizado'].includes(row.description);
+        const hasUserDetailRow = arr.some((other) =>
+          other.history_id !== row.history_id &&
+          other.user_id &&
+          (other.modified_field === row.modified_field || Math.abs(new Date(other.changed_at) - new Date(row.changed_at)) < 5000)
+        );
+        if (isGenericTrigger || hasUserDetailRow) return false;
+      }
+      return true;
+    });
+
+    res.json(cleanRows);
   } catch (err) {
     console.error('Get history error:', err);
     res.status(500).json({ error: 'Error al cargar historial.' });
@@ -3282,6 +3316,7 @@ app.get('/api/analytics', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener datos analíticos.' });
   }
 });
+
 
 // Start Express Server
 app.listen(PORT, '0.0.0.0', () => {

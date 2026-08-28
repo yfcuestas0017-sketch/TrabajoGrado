@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
 export const THEMES = [
-  { id: 'default', label: 'Ambar', accent: '#b31f3f', sidebar: '#0f1117' },
-  { id: 'ocean', label: 'Oceano', accent: '#38bdf8', sidebar: '#0a1628' },
+  { id: 'default', label: 'Institucional', accent: '#1F5BA3', sidebar: '#1F5BA3' },
+  { id: 'dark', label: 'Modo Noche', accent: '#38bdf8', sidebar: '#0f172a' },
+  { id: 'ocean', label: 'Océano', accent: '#38bdf8', sidebar: '#0a1628' },
   { id: 'forest', label: 'Bosque', accent: '#4ade80', sidebar: '#0d1f17' },
-  { id: 'crimson', label: 'Carmesi', accent: '#f87171', sidebar: '#180b0b' },
+  { id: 'crimson', label: 'Carmesí', accent: '#f87171', sidebar: '#180b0b' },
   { id: 'violet', label: 'Violeta', accent: '#a78bfa', sidebar: '#0e0b1a' },
 ];
 

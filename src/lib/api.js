@@ -72,14 +72,14 @@ export const api = {
     body: JSON.stringify(projectData),
   }),
 
-  updateProject: (id, projectData) => request(`/projects/${id}`, {
+  updateProject: (id, projectData, userId = null) => request(`/projects/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(projectData),
+    body: JSON.stringify({ ...projectData, userId: userId || projectData.userId }),
   }),
 
-  updateProjectParticipants: (id, participants) => request(`/projects/${id}/participants`, {
+  updateProjectParticipants: (id, participants, userId = null) => request(`/projects/${id}/participants`, {
     method: 'PUT',
-    body: JSON.stringify({ participants }),
+    body: JSON.stringify({ participants, userId }),
   }),
   deleteProject: (id) => request(`/projects/${id}`, {
     method: 'DELETE',
