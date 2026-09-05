@@ -1230,8 +1230,12 @@ app.get('/api/projects/:id/history', async (req, res) => {
   const projectId = parseInt(req.params.id, 10);
   if (isNaN(projectId)) return res.status(400).json({ error: 'ID de proyecto inválido.' });
 
+  const requestingUserId = req.query.userId || req.headers['x-user-id'] || null;
+
   try {
-    const query = `
+    const userCtx = await getUserContext(pool, requestingUserId);
+
+    let query = `
       SELECT 
         h.history_id, 
         h.description, 
@@ -1253,9 +1257,25 @@ app.get('/api/projects/:id/history', async (req, res) => {
       LEFT JOIN public.roles r ON r.role_id = ur.role_id
       JOIN public.project_histories ph ON ph.history_id = h.history_id
       WHERE ph.project_id = $1
-      ORDER BY h.changed_at DESC;
     `;
-    const result = await pool.query(query, [projectId]);
+    const params = [projectId];
+
+    // Restricción para Estudiantes y Docentes: solo ven sus propios cambios y los realizados por el Administrador
+    if (userCtx && (userCtx.role_name === 'estudiante' || userCtx.role_name === 'docente')) {
+      params.push(String(requestingUserId));
+      query += `
+        AND (
+          h.user_id::text = $${params.length}
+          OR LOWER(COALESCE(r.name, '')) IN ('administrador', 'admin')
+          OR u.user_id ILIKE 'admin%'
+          OR u.email ILIKE '%admin%'
+          OR h.user_id IS NULL
+        )
+      `;
+    }
+
+    query += ` ORDER BY h.changed_at DESC;`;
+    const result = await pool.query(query, params);
 
     res.json(result.rows);
   } catch (err) {
@@ -1474,7 +1494,7 @@ app.get('/api/project-bank/:id/history', async (req, res) => {
       }
     }
 
-    const historyQuery = `
+    let historyQuery = `
       SELECT 
         pbh.project_bank_history_id,
         pbh.project_bank_id,
@@ -1492,9 +1512,26 @@ app.get('/api/project-bank/:id/history', async (req, res) => {
       LEFT JOIN public.user_roles ur ON u.user_id = ur.user_id
       LEFT JOIN public.roles r ON ur.role_id = r.role_id
       WHERE pbh.project_bank_id = $1
-      ORDER BY pbh.created_at DESC;
     `;
-    const histRes = await pool.query(historyQuery, [id]);
+    const params = [id];
+
+    // Restricción para Estudiantes y Docentes: solo ven sus propios cambios y los realizados por el Administrador
+    if (userCtx && (userCtx.role_name === 'estudiante' || userCtx.role_name === 'docente')) {
+      params.push(String(requestingUserId));
+      historyQuery += `
+        AND (
+          pbh.user_id::text = $${params.length}
+          OR LOWER(COALESCE(r.name, '')) IN ('administrador', 'admin')
+          OR u.user_id ILIKE 'admin%'
+          OR u.email ILIKE '%admin%'
+          OR pbh.user_id IS NULL
+        )
+      `;
+    }
+
+    historyQuery += ` ORDER BY pbh.created_at DESC;`;
+
+    const histRes = await pool.query(historyQuery, params);
     res.json(histRes.rows);
   } catch (err) {
     console.error('Get project bank history error:', err);

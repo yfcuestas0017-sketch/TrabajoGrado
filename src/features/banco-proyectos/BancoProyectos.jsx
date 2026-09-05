@@ -971,7 +971,7 @@ export default function BancoProyectos() {
               {/* HISTORIAL DE TRAZABILIDAD */}
               <div className="banco-detail-section" style={{ marginTop: '12px' }}>
                 <span className="banco-detail-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Clock size={14} /> Historial y Trazabilidad de Cambios
+                  <Clock size={14} /> {(isStudent || isDocente) ? 'Historial de Cambios (Propios y de Administración)' : 'Historial y Trazabilidad de Cambios'}
                 </span>
                 {loadingHistory ? (
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '12px 0' }}>
@@ -983,7 +983,9 @@ export default function BancoProyectos() {
                   </div>
                 ) : projectHistory.length === 0 ? (
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '8px 0' }}>
-                    No hay registros de historial para este proyecto.
+                    {(isStudent || isDocente)
+                      ? 'No hay registros de cambios realizados por ti o por el administrador para este proyecto.'
+                      : 'No hay registros de historial para este proyecto.'}
                   </div>
                 ) : (
                   <div className="banco-history-timeline">

@@ -106,7 +106,7 @@ export function ProyectosPage() {
 
     setHistoryLoading(true);
     try {
-      const data = await api.getProjectHistory(projectId);
+      const data = await api.getProjectHistory(projectId, user?.id);
       const mappedHistory = (data ?? []).map((history) => {
         const field = (history.modified_field || '').toLowerCase();
         let title = history.description || 'Actualización registrada';
@@ -1072,18 +1072,17 @@ export function ProyectosPage() {
                           Ver
                         </Button>
                         {!isLimitedUser && (
-                          <>
-                            <Button variant="ghost" size="sm" onClick={() => setEditModal(project)}>Editar</Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              icon={History}
-                              onClick={() => { setHistoryModal(project); fetchHistory(project.id); }}
-                            >
-                              Historial
-                            </Button>
-                          </>
+                          <Button variant="ghost" size="sm" onClick={() => setEditModal(project)}>Editar</Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={History}
+                          onClick={() => { setHistoryModal(project); fetchHistory(project.id); }}
+                          title="Ver historial del proyecto"
+                        >
+                          Historial
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -1186,16 +1185,14 @@ export function ProyectosPage() {
                 {!isLimitedUser && (
                   <Button variant="ghost" icon={Pencil} onClick={() => { setDetailModal(null); setEditModal(detailModal); }}>Editar</Button>
                 )}
-                {!isStudent && (
-                  <Button variant="ghost" icon={History} onClick={() => {
-                    const p = detailModal;
-                    setDetailModal(null);
-                    setHistoryModal(p);
-                    fetchHistory(p.id);
-                  }}>
-                    Historial
-                  </Button>
-                )}
+                <Button variant="ghost" icon={History} onClick={() => {
+                  const p = detailModal;
+                  setDetailModal(null);
+                  setHistoryModal(p);
+                  fetchHistory(p.id);
+                }}>
+                  Historial
+                </Button>
                 <button className="modal-close-btn" type="button" onClick={() => setDetailModal(null)}>
                   Cerrar
                 </button>
@@ -1210,7 +1207,11 @@ export function ProyectosPage() {
             <div className="modal-box modal-box--lg" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <div className="modal-header-text">
-                  <span className="modal-eyebrow">Auditoría y trazabilidad</span>
+                  <span className="modal-eyebrow">
+                    {isLimitedUser 
+                      ? 'Auditoría y trazabilidad (Cambios propios y de administración)' 
+                      : 'Auditoría y trazabilidad completa'}
+                  </span>
                   <h2 className="modal-title">Historial de Cambios: {historyModal.title}</h2>
                   <span className="modal-code">{historyModal.code}</span>
                 </div>
@@ -1268,7 +1269,11 @@ export function ProyectosPage() {
                 ) : (
                   <div className="history-empty">
                     <History size={38} style={{ opacity: 0.25, marginBottom: 10 }} />
-                    <p>No hay registros de cambios almacenados para este proyecto.</p>
+                    <p>
+                      {isLimitedUser
+                        ? 'No hay registros de cambios realizados por ti o por el administrador para este proyecto.'
+                        : 'No hay registros de cambios almacenados para este proyecto.'}
+                    </p>
                   </div>
                 )}
               </div>

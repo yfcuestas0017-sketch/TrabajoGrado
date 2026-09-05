@@ -93,7 +93,10 @@ export const api = {
     method: 'DELETE',
   }),
 
-  getProjectHistory: (id) => request(`/projects/${id}/history`),
+  getProjectHistory: (id, userId = null) => {
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+    return request(`/projects/${id}/history${query}`);
+  },
 
   // Reports
   getDetailedReportProjects: (filters = {}) => {
