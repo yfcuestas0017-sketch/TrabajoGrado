@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, CalendarDays, ChevronDown, CircleHelp, FolderGit2, LineChart, Send, Users } from 'lucide-react';
+import { Bot, CalendarDays, ChevronDown, CircleHelp, FolderGit2, GraduationCap, LineChart, Send, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 import './Chatbook.css';
@@ -14,6 +14,18 @@ const ROLE_CATEGORIES = {
         '¿Qué proyectos están disponibles?',
         'Busca proyectos relacionados con mi línea.',
         'Muéstrame proyectos similares.',
+      ],
+    },
+    opciones: {
+      label: 'Opciones',
+      icon: GraduationCap,
+      questions: [
+        '¿Qué opciones de grado existen?',
+        '¿Cuántos proyectos se fueron por proyecto de grado?',
+        '¿Cuántos estudiantes escogieron coterminalidad?',
+        '¿Cómo se distribuyen las opciones de grado?',
+        '¿Cuál es la opción de grado más utilizada?',
+        '¿Cuál es la diferencia entre proyecto de grado y coterminalidad?',
       ],
     },
     estados: {
@@ -39,6 +51,17 @@ const ROLE_CATEGORIES = {
     },
   },
   docente: {
+    opciones: {
+      label: 'Opciones',
+      icon: GraduationCap,
+      questions: [
+        '¿Qué opciones de grado existen?',
+        '¿Cómo se distribuyen las opciones de grado?',
+        '¿Cuántos proyectos se fueron por proyecto de grado?',
+        '¿Cuántos estudiantes escogieron coterminalidad?',
+        '¿Cuál opción tuvo más proyectos?',
+      ],
+    },
     fechas: {
       label: 'Fechas',
       icon: CalendarDays,
@@ -92,6 +115,18 @@ const ROLE_CATEGORIES = {
     },
   },
   admin: {
+    opciones: {
+      label: 'Opciones',
+      icon: GraduationCap,
+      questions: [
+        '¿Qué opciones de grado existen?',
+        '¿Cómo se distribuyen las opciones de grado?',
+        '¿Cuántos proyectos hay por opción de grado?',
+        '¿Cuántos estudiantes eligieron cada opción?',
+        '¿Cuál es la opción de grado más utilizada?',
+        '¿Qué porcentaje corresponde a coterminalidad?',
+      ],
+    },
     fechas: {
       label: 'Fechas',
       icon: CalendarDays,
@@ -317,10 +352,10 @@ export default function Chatbook() {
   const [activeCategory, setActiveCategory] = useState('proyectos');
 
   const welcomeText = isStudent
-    ? `Hola. Soy Chatbook, tu asistente virtual para la gestión de proyectos de grado en ${programName}. Puedo orientarte en tus proyectos, sus estados y líneas de investigación. ¿Qué deseas consultar hoy?`
+    ? `Hola. Soy Chatbook, tu asistente virtual para la gestión de proyectos de grado en ${programName}. Puedo orientarte en tus proyectos, sus estados, opciones de grado y líneas de investigación. ¿Qué deseas consultar hoy?`
     : roleKey === 'docente'
-      ? `Hola. Soy Chatbook, tu asistente virtual para la gestión de proyectos de grado en ${programName}. Puedes consultar los proyectos que asesoras, fechas de entrega, estados, estudiantes y líneas de investigación. ¿En qué te puedo colaborar?`
-      : `Hola. Soy Chatbook, tu asistente de gestión de proyectos de grado para ${programName}. Puedo ayudarte con estadísticas, proyectos por estado, fechas de finalización, líneas de investigación y docentes. ¿Qué deseas consultar?`;
+      ? `Hola. Soy Chatbook, tu asistente virtual para la gestión de proyectos de grado en ${programName}. Puedes consultar los proyectos que asesoras, opciones de grado, fechas de entrega, estados, estudiantes y líneas de investigación. ¿En qué te puedo colaborar?`
+      : `Hola. Soy Chatbook, tu asistente de gestión de proyectos de grado para ${programName}. Puedo ayudarte con estadísticas, opciones de grado, proyectos por estado, fechas de finalización, líneas de investigación y docentes. ¿Qué deseas consultar?`;
 
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');

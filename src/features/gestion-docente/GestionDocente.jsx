@@ -11,29 +11,14 @@ import './GestionDocente.css';
 export default function GestionDocente() {
   const { user } = useAuth();
   const userProgramId = user?.programId ?? null;
+  const currentUserId = String(user?.user_id || user?.id || '');
 
   const [docentes, setDocentes] = useState([]);
-  const [lines, setLines] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [programs, setPrograms] = useState([]);
+  const [selectedProgramId, setSelectedProgramId] = useState(userProgramId ? String(userProgramId) : 'all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-
-  const [showForm, setShowForm] = useState(false);
-  const [selectedDocenteId, setSelectedDocenteId] = useState('');
-  const [assignLine, setAssignLine] = useState('');
-  const [assignRole, setAssignRole] = useState('asesor');
-  const [assignProject, setAssignProject] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addSearchEmail, setAddSearchEmail] = useState('');
-  const [addSearchResult, setAddSearchResult] = useState(null);
-  const [addSearching, setAddSearching] = useState(false);
-  const [addError, setAddError] = useState('');
-  const [addSuccess, setAddSuccess] = useState('');
 
   const [detailDocente, setDetailDocente] = useState(null);
   const [activeFilter, setActiveFilter] = useState(null);
@@ -42,42 +27,78 @@ export default function GestionDocente() {
     setLoading(true);
     setError('');
     try {
-      const allProjects = await api.getProjects(userProgramId);
+      // 1. Consultar todos los docentes de la BD para el programa seleccionado y los proyectos
+      const [teachersData, allProjects, catData] = await Promise.all([
+        api.getTeachers(selectedProgramId, currentUserId).catch(() => []),
+        api.getProjects(selectedProgramId).catch(() => []),
+        api.getCatalogs().catch(() => ({ programs: [] })),
+      ]);
+
+      setPrograms(catData.programs || []);
 
       const docenteMap = {};
 
-      const registerAssignment = (person, project, role) => {
-        if (!person?.id) return;
-        if (userProgramId !== null && person.programId && String(person.programId) !== String(userProgramId)) {
-          return;
-        }
-        if (!docenteMap[person.id]) {
-          docenteMap[person.id] = {
-            user_id: person.id,
-            full_name: person.name || 'Sin nombre',
-            email: person.email || '',
-            program_name: person.program || null,
-            programId: person.programId,
-            assignments: [],
-          };
-        }
-        docenteMap[person.id].assignments.push({
-          project_id: project.id,
-          title: project.title,
-          code: project.code,
-          line: project.line,
-          role,
-        });
-      };
+      // 2. Inicializar con TODOS los docentes registrados en la base de datos
+      (teachersData || []).forEach((t) => {
+        const uid = String(t.user_id);
+        docenteMap[uid] = {
+          user_id: uid,
+          full_name: t.full_name || 'Sin nombre',
+          email: t.email || '',
+          program_name: t.program_name || 'Sin programa',
+          programId: t.program_id,
+          assignments: [],
+        };
+      });
 
-      (allProjects || []).forEach(p => {
-        (p.advisors || []).forEach(a => registerAssignment(a, p, 'asesor'));
-        (p.jurors || []).forEach(a => registerAssignment(a, p, 'jurado'));
+      // 3. Contabilizar y asociar asignaciones reales de asesor y jurado desde proyectos
+      (allProjects || []).forEach((p) => {
+        (p.advisors || []).forEach((a) => {
+          const id = String(a.id);
+          if (!docenteMap[id]) {
+            docenteMap[id] = {
+              user_id: id,
+              full_name: a.name || 'Sin nombre',
+              email: a.email || '',
+              program_name: a.program || null,
+              programId: a.programId,
+              assignments: [],
+            };
+          }
+          docenteMap[id].assignments.push({
+            project_id: p.id,
+            title: p.title,
+            code: p.code,
+            line: p.line,
+            role: 'asesor',
+          });
+        });
+
+        (p.jurors || []).forEach((j) => {
+          const id = String(j.id);
+          if (!docenteMap[id]) {
+            docenteMap[id] = {
+              user_id: id,
+              full_name: j.name || 'Sin nombre',
+              email: j.email || '',
+              program_name: j.program || null,
+              programId: j.programId,
+              assignments: [],
+            };
+          }
+          docenteMap[id].assignments.push({
+            project_id: p.id,
+            title: p.title,
+            code: p.code,
+            line: p.line,
+            role: 'jurado',
+          });
+        });
       });
 
       let docentesList = Object.values(docenteMap);
-      if (userProgramId !== null) {
-        docentesList = docentesList.filter(d => !d.programId || String(d.programId) === String(userProgramId));
+      if (selectedProgramId && selectedProgramId !== 'all') {
+        docentesList = docentesList.filter((d) => !d.programId || String(d.programId) === String(selectedProgramId));
       }
       docentesList.sort((a, b) => a.full_name.localeCompare(b.full_name));
       setDocentes(docentesList);
@@ -87,32 +108,18 @@ export default function GestionDocente() {
     } finally {
       setLoading(false);
     }
-  }, [userProgramId]);
+  }, [selectedProgramId, currentUserId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   // Si el docente en detalle cambia tras recargar datos, sincronizarlo
   useEffect(() => {
     if (!detailDocente) return;
-    const updated = docentes.find(d => String(d.user_id) === String(detailDocente.user_id));
+    const updated = docentes.find((d) => String(d.user_id) === String(detailDocente.user_id));
     if (updated) setDetailDocente(updated);
   }, [docentes]); // eslint-disable-line react-hooks/exhaustive-deps
-  const handleSearchEmail = async () => {
-    if (!addSearchEmail.trim()) return;
-    setAddSearching(true);
-    setAddError('');
-    setAddSearchResult(null);
-    try {
-      const res = await api.checkCoauthor(addSearchEmail.trim());
-      setAddSearchResult(res.user);
-    } catch (err) {
-      setAddError(err.message || 'Usuario no encontrado.');
-    } finally {
-      setAddSearching(false);
-    }
-  };
 
-  const filteredDocentes = docentes.filter(d => {
+  const filteredDocentes = docentes.filter((d) => {
     const text = search.toLowerCase();
     return d.full_name.toLowerCase().includes(text) || d.email.toLowerCase().includes(text);
   });
@@ -127,13 +134,13 @@ export default function GestionDocente() {
     setActiveFilter(null);
   };
 
-  const asesorCount = detailDocente ? detailDocente.assignments.filter(a => a.role === 'asesor').length : 0;
-  const juradoCount = detailDocente ? detailDocente.assignments.filter(a => a.role === 'jurado').length : 0;
+  const asesorCount = detailDocente ? detailDocente.assignments.filter((a) => a.role === 'asesor').length : 0;
+  const juradoCount = detailDocente ? detailDocente.assignments.filter((a) => a.role === 'jurado').length : 0;
 
   const visibleAssignments = useMemo(() => {
     if (!detailDocente) return [];
     if (!activeFilter) return detailDocente.assignments;
-    return detailDocente.assignments.filter(a => a.role === activeFilter);
+    return detailDocente.assignments.filter((a) => a.role === activeFilter);
   }, [detailDocente, activeFilter]);
 
   return (
@@ -148,13 +155,28 @@ export default function GestionDocente() {
                   type="text"
                   placeholder="Buscar docente por nombre o correo..."
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={(e) => setSearch(e.target.value)}
                   className="gd-search-input"
                 />
               </div>
-              <Button variant="primary" icon={UserPlus} onClick={() => setShowAddModal(true)}>
-                Registrar Docente
-              </Button>
+
+              {/* Selector de Programa Académico */}
+              <div className="gd-program-select-wrap">
+                <select
+                  className="gd-program-select"
+                  value={selectedProgramId}
+                  onChange={(e) => setSelectedProgramId(e.target.value)}
+                  disabled={user?.role?.toLowerCase() === 'estudiante'}
+                >
+                  <option value="all">Todos los programas</option>
+                  {programs.map((pr) => (
+                    <option key={pr.program_id} value={String(pr.program_id)}>
+                      {pr.name} {userProgramId && String(pr.program_id) === String(userProgramId) ? ' (Tu programa)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="gd-program-chevron" />
+              </div>
             </div>
 
             <div className="gd-meta">
@@ -299,60 +321,6 @@ export default function GestionDocente() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Modal Registrar Docente */}
-        {showAddModal && (
-          <div className="gd-modal-overlay" onClick={() => setShowAddModal(false)}>
-            <div className="gd-modal" onClick={e => e.stopPropagation()}>
-              <div className="gd-modal-header">
-                <div className="gd-modal-icon"><UserPlus size={18} /></div>
-                <div>
-                  <h3>Buscar docente</h3>
-                  <p>Ingresa el correo institucional del docente ya registrado en el sistema.</p>
-                </div>
-                <button className="gd-modal-close" onClick={() => setShowAddModal(false)}><X size={16} /></button>
-              </div>
-
-              <div className="field">
-                <label className="field-label">Correo electrónico</label>
-                <input
-                  type="email"
-                  className="field-input"
-                  value={addSearchEmail}
-                  onChange={e => setAddSearchEmail(e.target.value)}
-                  placeholder="docente@universidad.edu.co"
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSearchEmail(); } }}
-                />
-                <span className="field-hint">
-                  Un docente aparece en esta sección automáticamente cuando se le asigna un proyecto
-                  como asesor o jurado desde Gestión de Proyectos.
-                </span>
-              </div>
-
-              <div style={{ marginTop: 14 }}>
-                <Button variant="primary" onClick={handleSearchEmail} loading={addSearching} fullWidth>
-                  {addSearching ? 'Buscando...' : 'Buscar'}
-                </Button>
-              </div>
-
-              {addError && <p className="epm-inline-error" style={{ marginTop: 10 }}>{addError}</p>}
-
-              {addSearchResult && (
-                <div className="gd-add-result">
-                  <div className="gd-add-avatar">{(addSearchResult.full_name || '?').charAt(0).toUpperCase()}</div>
-                  <div className="gd-add-info">
-                    <span className="gd-add-name">{addSearchResult.full_name}</span>
-                    <span className="gd-add-email">{addSearchResult.email}</span>
-                    {addSearchResult.program_name && (
-                      <span className="gd-add-program">{addSearchResult.program_name}</span>
-                    )}
-                  </div>
-                  <span className="gd-add-status">Encontrado</span>
                 </div>
               )}
             </div>

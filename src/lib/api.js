@@ -37,6 +37,13 @@ export const api = {
   // Catalogs
   getCatalogs: (programId = null) => request(`/catalogs${programId ? `?program_id=${encodeURIComponent(programId)}` : ''}`),
   getDegreeOptions: () => request('/degree-options'),
+  getTeachers: (programId = null, userId = null) => {
+    const params = new URLSearchParams();
+    if (programId && programId !== 'all') params.append('programId', programId);
+    if (userId) params.append('userId', userId);
+    const qs = params.toString();
+    return request(`/teachers${qs ? `?${qs}` : ''}`);
+  },
 
   // Users
   checkCoauthor: (email) => request(`/users/check-coauthor?email=${encodeURIComponent(email)}`),
@@ -109,6 +116,51 @@ export const api = {
 
   // Analytics
   getAnalytics: (adminProgramId = null) => request(`/analytics${adminProgramId ? `?adminProgramId=${adminProgramId}` : ''}`),
+
+  // Banco de Proyectos
+  getProjectBank: (filters = {}, userId = null) => {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    Object.entries(filters).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '' && val !== 'all') {
+        params.append(key, val);
+      }
+    });
+    const queryString = params.toString();
+    return request(`/project-bank${queryString ? `?${queryString}` : ''}`);
+  },
+
+  getProjectBankDetail: (id, userId = null) => {
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+    return request(`/project-bank/${id}${query}`);
+  },
+
+  getProjectBankHistory: (id, userId = null) => {
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+    return request(`/project-bank/${id}/history${query}`);
+  },
+
+  createProjectBankIdea: (payload) => request('/project-bank', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+
+  updateProjectBankIdea: (id, payload) => request(`/project-bank/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  }),
+
+  toggleProjectBankStatus: (id, status, userRole, userId = null) => request(`/project-bank/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, userRole, userId }),
+  }),
+
+  selectProjectBankIdea: (id, studentId) => request(`/project-bank/${id}/select`, {
+    method: 'POST',
+    body: JSON.stringify({ studentId }),
+  }),
+
+  getStudentAssignedProject: (studentId) => request(`/project-bank/student/${encodeURIComponent(studentId)}`),
 };
 
 export default api;

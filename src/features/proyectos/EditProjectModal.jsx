@@ -44,8 +44,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
-  const [history, setHistory] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
 
   // ── Equipo del proyecto (solo admin) ──────────────────────────────────
   const initialTeam = [
@@ -91,21 +89,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
     );
   }, [sublines, form.lineId]);
 
-  const fetchHistory = useCallback(async () => {
-    setLoadingHistory(true);
-    try {
-      const data = await api.getProjectHistory(project.id);
-      setHistory(data || []);
-    } catch (_) {
-      setHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [project.id]);
-
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
 
   const handleAddTeamMember = async () => {
     const email = newEmail.trim();
@@ -385,39 +368,6 @@ export default function EditProjectModal({ project, statuses, modalities, lines,
                 </button>
               </div>
             </form>
-          </div>
-
-          <div className="epm-right">
-            <div className="epm-panel-card">
-              <div className="epm-panel-header">
-                <span className="epm-panel-label">Historial de cambios</span>
-              </div>
-              {loadingHistory ? (
-                <div className="epm-empty">Cargando historial...</div>
-              ) : history.length === 0 ? (
-                <div className="epm-empty">Sin modificaciones registradas.</div>
-              ) : (
-                <div className="epm-history-list">
-                  {history.map(item => (
-                    <div key={item.history_id} className="epm-history-item">
-                      <span className="epm-history-desc">{item.description || 'Actualización'}</span>
-                      {item.modified_field && (
-                        <span className="epm-history-detail">
-                          Campo: {item.modified_field} ({item.old_value} &rarr; {item.new_value})
-                        </span>
-                      )}
-                      <span className="epm-history-date">
-                        {item.changed_at ? new Date(item.changed_at).toLocaleString('es-CO') : ''}
-                      </span>
-                      <span className="epm-history-user">
-                        {item.user_name || item.user_email || 'Usuario no identificado'}
-                        {item.user_email && item.user_name ? ` · ${item.user_email}` : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>

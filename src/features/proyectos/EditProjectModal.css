@@ -19,7 +19,8 @@
           border-radius: var(--border-radius-xl);
           box-shadow: 0 24px 64px rgba(0,0,0,0.2);
           width: 100%;
-          max-width: 1100px;
+          max-width: 780px;
+          max-height: 90vh;
           display: flex;
           flex-direction: column;
           animation: epmSlideUp 0.22s ease;
@@ -88,28 +89,35 @@
         }
         .epm-history-btn:hover { background: color-mix(in srgb, var(--accent-primary) 15%, transparent); }
 
-        /* ── BODY ── */
+        /* ── BODY CON SCROLLBAR VISIBLE ── */
         .epm-body {
-          display: grid;
-          grid-template-columns: 1fr 280px;
-          gap: 0;
+          display: block;
+          flex: 1 1 auto;
           min-height: 0;
-          overflow: hidden;
+          overflow-y: scroll;
+          overflow-x: hidden;
+          scrollbar-width: thin;
+          scrollbar-color: var(--accent-primary, #1F5BA3) var(--bg-secondary, #f1f5f9);
+        }
+
+        .epm-body::-webkit-scrollbar {
+          width: 8px;
+        }
+        .epm-body::-webkit-scrollbar-track {
+          background: var(--bg-secondary, #f1f5f9);
+          border-radius: 4px;
+        }
+        .epm-body::-webkit-scrollbar-thumb {
+          background: var(--accent-primary, #1F5BA3);
+          border-radius: 4px;
+        }
+        .epm-body::-webkit-scrollbar-thumb:hover {
+          background: #17457a;
         }
 
         .epm-left {
-          padding: 20px 24px;
-          overflow-y: auto;
-          border-right: 1px solid var(--border-color);
-        }
-
-        .epm-right {
-          padding: 16px;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          background: var(--bg-primary);
+          padding: 24px 28px 40px;
+          border-right: none;
         }
 
         /* ── SECTION TITLE ── */
@@ -412,14 +420,65 @@
 
         /* ── RESPONSIVE ── */
         @media (max-width: 820px) {
-          .epm-body { grid-template-columns: 1fr; }
-          .epm-left { border-right: none; border-bottom: 1px solid var(--border-color); }
-          .epm-right { flex-direction: row; flex-wrap: wrap; }
-          .epm-panel-card { flex: 1 1 240px; }
+          .epm-left { padding: 18px 20px; }
         }
         @media (max-width: 540px) {
           .epm-grid2 { grid-template-columns: 1fr; }
           .epm-span2 { grid-column: span 1; }
           .epm-modal { border-radius: var(--border-radius-lg); }
+        }
+
+        /* ── BOTONES DE ACCIÓN DEL FORMULARIO ── */
+        .epm-form-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 12px;
+          margin-top: 28px;
+          padding-top: 18px;
+          border-top: 1px solid var(--border-color);
+        }
+
+        .epm-btn-primary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 9px 18px;
+          border-radius: var(--border-radius-sm, 8px);
+          background: var(--accent-primary, #1F5BA3);
+          color: #ffffff;
+          font-size: 0.86rem;
+          font-weight: 600;
+          border: none;
+          cursor: pointer;
+          transition: background 0.15s ease, transform 0.1s ease;
+        }
+        .epm-btn-primary:hover:not(:disabled) {
+          background: #17457a;
+          transform: translateY(-1px);
+        }
+        .epm-btn-primary:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+
+        .epm-btn-ghost {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 9px 16px;
+          border-radius: var(--border-radius-sm, 8px);
+          background: transparent;
+          color: var(--text-secondary, #64748b);
+          font-size: 0.86rem;
+          font-weight: 600;
+          border: 1px solid var(--border-color, #e2e8f0);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .epm-btn-ghost:hover {
+          background: var(--bg-secondary, #f1f5f9);
+          color: var(--text-primary, #0f172a);
         }
       

@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
+  Award,
+  BookOpen,
+  Calendar,
   CheckCircle2,
   ChevronDown,
+  ExternalLink,
   GraduationCap,
+  Layers,
   Lock,
   Mail,
   Pencil,
   Save,
+  Tag,
   User,
+  UserCheck,
   X,
 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
@@ -35,16 +43,24 @@ function InfoRow({ icon: Icon, label, value, muted }) {
 
 export default function AjustesPage() {
   const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [programs, setPrograms] = useState([]);
   const [semesters, setSemesters] = useState([]);
+
+  // Estudiante: Mi proyecto de grado
+  const [assignedProject, setAssignedProject] = useState(null);
+  const [loadingProject, setLoadingProject] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState('');
+
+  const isStudent = (user?.role?.toLowerCase() || '') === 'estudiante';
+  const currentUserId = String(user?.user_id || user?.id || '');
 
   useEffect(() => {
     async function load() {
@@ -58,9 +74,35 @@ export default function AjustesPage() {
       } finally {
         setLoadingProfile(false);
       }
+
+      // Cargar proyecto asignado si es estudiante
+      if (isStudent && currentUserId) {
+        setLoadingProject(true);
+        try {
+          const res = await api.getStudentAssignedProject(currentUserId);
+          if (res?.hasAssignedProject && res?.project) {
+            setAssignedProject(res.project);
+          } else {
+            setAssignedProject(null);
+          }
+        } catch (err) {
+          console.error('Error cargando proyecto asignado:', err);
+        } finally {
+          setLoadingProject(false);
+        }
+      }
     }
     load();
-  }, [user?.id]);
+  }, [user?.id, isStudent, currentUserId]);
+
+  useEffect(() => {
+    if (window.location.hash === '#mi-proyecto-de-grado') {
+      setTimeout(() => {
+        const el = document.getElementById('mi-proyecto-de-grado');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 350);
+    }
+  }, [assignedProject]);
 
   const startEdit = () => {
     setForm({
@@ -162,6 +204,92 @@ export default function AjustesPage() {
                 </div>
               )}
             </div>
+
+            {/* SECCIÓN MI PROYECTO DE GRADO (SOLO ESTUDIANTE) */}
+            {isStudent && (
+              <div id="mi-proyecto-de-grado" className="settings-card settings-card--project-grade">
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Award size={18} color="var(--accent-primary)" />
+                    <h3 className="card-title">Mi proyecto de grado</h3>
+                  </div>
+                  {assignedProject && (
+                    <span className="banco-badge-status banco-badge-status--asignado" style={{ fontSize: '0.74rem', padding: '3px 10px', borderRadius: '999px', fontWeight: 700 }}>
+                      {assignedProject.status}
+                    </span>
+                  )}
+                </div>
+
+                {loadingProject ? (
+                  <div className="settings-loading">Cargando proyecto de grado...</div>
+                ) : assignedProject ? (
+                  <div className="project-grade-body">
+                    <h4 className="project-grade-title">{assignedProject.title}</h4>
+                    <p className="project-grade-desc">{assignedProject.description}</p>
+
+                    <div className="project-grade-meta-grid">
+                      <div className="project-grade-meta-item">
+                        <span className="project-grade-meta-label">Línea de investigación</span>
+                        <span className="project-grade-meta-val">{assignedProject.line_name || 'Sin línea'}</span>
+                      </div>
+                      {assignedProject.subline_name && (
+                        <div className="project-grade-meta-item">
+                          <span className="project-grade-meta-label">Sublínea</span>
+                          <span className="project-grade-meta-val">{assignedProject.subline_name}</span>
+                        </div>
+                      )}
+                      <div className="project-grade-meta-item">
+                        <span className="project-grade-meta-label">Proponente</span>
+                        <span className="project-grade-meta-val">
+                          {assignedProject.proposer_name} ({assignedProject.proposer_role})
+                        </span>
+                      </div>
+                      {assignedProject.proposer_email && (
+                        <div className="project-grade-meta-item">
+                          <span className="project-grade-meta-label">Contacto proponente</span>
+                          <span className="project-grade-meta-val">{assignedProject.proposer_email}</span>
+                        </div>
+                      )}
+                      <div className="project-grade-meta-item">
+                        <span className="project-grade-meta-label">Fecha de asignación</span>
+                        <span className="project-grade-meta-val">
+                          {assignedProject.assigned_at
+                            ? new Date(assignedProject.assigned_at).toLocaleDateString('es-CO', {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric',
+                              })
+                            : 'No registrada'}
+                        </span>
+                      </div>
+                      <div className="project-grade-meta-item">
+                        <span className="project-grade-meta-label">Estado actual</span>
+                        <span className="project-grade-meta-val" style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>
+                          {assignedProject.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="project-grade-footer-note">
+                      📌 <strong>Fase inicial:</strong> Esta idea seleccionada en el Banco de Proyectos es la base oficial para continuar posteriormente con la formulación del anteproyecto y las siguientes fases de tu trabajo de grado.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="project-grade-empty">
+                    <BookOpen size={36} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
+                    <p style={{ fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
+                      No tienes un proyecto de grado asignado aún
+                    </p>
+                    <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: '0 0 16px 0', maxWidth: '420px', textAlign: 'center' }}>
+                      Explora el catálogo del Banco de Proyectos y escoge la idea de investigación que mejor se adapte a tus intereses académicos.
+                    </p>
+                    <Button variant="primary" icon={BookOpen} onClick={() => navigate('/facultades')}>
+                      Explorar Banco de Proyectos
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* FORMULARIO DE EDICIÓN */}
             {editing && (

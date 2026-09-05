@@ -407,7 +407,7 @@ export function ProyectosPage() {
         if (!studentActionData.fileUrl.trim()) throw new Error('Ingresa el enlace del documento.');
         await api.createResearchDocument(studentProcess.project.id, {
           userId: user.id,
-          documentType: studentAction,
+          documentType: studentAction || 'enlace_biblioteca',
           fileUrl: studentActionData.fileUrl,
           observations: studentActionData.observations,
         });
@@ -690,22 +690,50 @@ export function ProyectosPage() {
                   <span>Línea: {studentProcess.project.line || 'No registrada'}</span>
                   <span>Opción de grado: <strong>{studentProcess.project.degreeOptionName || 'Opción de grado pendiente'}</strong></span>
                   <span>Integrantes: {studentProcess.project.participants?.map((person) => person.name).join(', ') || 'No registrados'}</span>
-                  <div className="student-process-actions">
-                    {studentPhase !== 'I' && <button type="button" onClick={() => openStudentAction('progress')}>Registrar avance</button>}
-                    {studentPhase === 'II' && <button type="button" onClick={() => openStudentAction('avance_documento')}>Subir documento</button>}
-                    {studentPhase === 'III' && <button type="button" onClick={() => openStudentAction('producto_final')}>Subir producto final</button>}
-                    {studentPhase === 'III' && <button type="button" onClick={() => openStudentAction('documento_final')}>Subir documento final</button>}
-                  </div>
                 </div>
               )}
-              {studentRecords.progress.length > 0 && <div className="student-process-records"><strong>Avances registrados</strong>{studentRecords.progress.map((item) => <span key={item.progress_id}>{new Date(item.created_at).toLocaleDateString('es-CO')}: {item.description}</span>)}</div>}
-              {studentRecords.documents.length > 0 && <div className="student-process-records"><strong>Documentos registrados</strong>{studentRecords.documents.map((item) => <a key={item.document_id} href={item.file_url} target="_blank" rel="noreferrer">{item.document_type} · {new Date(item.delivered_at).toLocaleDateString('es-CO')}</a>)}</div>}
-              {studentAction && <form className="student-process-form" onSubmit={submitStudentAction}>
-                <strong>{studentAction === 'progress' ? 'Registrar avance' : 'Registrar documento'}</strong>
-                {studentAction === 'progress' ? <textarea value={studentActionData.description} onChange={(event) => setStudentActionData((current) => ({ ...current, description: event.target.value }))} placeholder="Describe el avance realizado..." rows="3" required /> : <><input type="url" value={studentActionData.fileUrl} onChange={(event) => setStudentActionData((current) => ({ ...current, fileUrl: event.target.value }))} placeholder="Enlace al documento o evidencia" required /><textarea value={studentActionData.observations} onChange={(event) => setStudentActionData((current) => ({ ...current, observations: event.target.value }))} placeholder="Observaciones (opcional)" rows="2" /></>}
-                {studentActionError && <span className="student-process-error">{studentActionError}</span>}
-                <div className="student-process-form-actions"><button type="button" onClick={() => setStudentAction('')}>Cancelar</button><button type="submit" disabled={studentActionSaving}>{studentActionSaving ? 'Guardando...' : 'Guardar'}</button></div>
-              </form>}
+              {studentPhase === 'III' && studentProcess?.project && (() => {
+                const projectStatus = (studentProcess.project.status || '').toLowerCase();
+                const isFinished = ['finalizado', 'terminado', 'completado'].some(word => projectStatus.includes(word));
+                const bibliotecaDoc = studentRecords.documents.find(d => d.document_type === 'enlace_biblioteca');
+                if (isFinished) {
+                  return (
+                    <div className="student-process-finalizado">
+                      <span className="student-process-finalizado-icon">✓</span>
+                      <div>
+                        <strong>Proyecto finalizado</strong>
+                        <p>Tu proyecto ha sido marcado como <em>{studentProcess.project.status}</em>. No se pueden realizar más cambios.</p>
+                        {bibliotecaDoc && (
+                          <a href={bibliotecaDoc.file_url} target="_blank" rel="noreferrer" className="student-process-finalizado-link">Ver proyecto en Biblioteca CESMAG →</a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                <form className="student-process-form student-process-form--biblioteca" onSubmit={submitStudentAction}>
+                  <strong>Enlace del proyecto en Biblioteca Universidad CESMAG</strong>
+                  <p className="student-process-form-hint">Ingresa el enlace permanente de tu proyecto final publicado en el repositorio de la Biblioteca de la Universidad CESMAG.</p>
+                  <input
+                    type="url"
+                    value={studentActionData.fileUrl}
+                    onChange={(event) => setStudentActionData((current) => ({ ...current, fileUrl: event.target.value }))}
+                    placeholder="https://biblioteca.cesmag.edu.co/..."
+                    required
+                  />
+                  {studentActionError && <span className="student-process-error">{studentActionError}</span>}
+                  <div className="student-process-form-actions">
+                    <button type="submit" disabled={studentActionSaving}>{studentActionSaving ? 'Guardando...' : 'Guardar enlace'}</button>
+                  </div>
+                </form>
+                );
+              })()}
+              {studentRecords.documents.length > 0 && studentPhase === 'III' && (() => {
+                const projectStatus = (studentProcess?.project?.status || '').toLowerCase();
+                const isFinished = ['finalizado', 'terminado', 'completado'].some(word => projectStatus.includes(word));
+                if (isFinished) return null;
+                return <div className="student-process-records"><strong>Documentos registrados</strong>{studentRecords.documents.map((item) => <a key={item.document_id} href={item.file_url} target="_blank" rel="noreferrer">{item.document_type} · {new Date(item.delivered_at).toLocaleDateString('es-CO')}</a>)}</div>;
+              })()}
             </div>
           </section>
         )}
@@ -1196,8 +1224,8 @@ export function ProyectosPage() {
                   <div className="history-empty">Cargando historial de auditoría...</div>
                 ) : historyItems.length > 0 ? (
                   <div className="history-timeline">
-                    {historyItems.map((item) => (
-                      <div key={item.id} className="timeline-item" style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px dashed var(--border-color)' }}>
+                    {historyItems.map((item, idx) => (
+                      <div key={item.id ? `timeline-${item.id}-${idx}` : `timeline-idx-${idx}`} className="timeline-item" style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px dashed var(--border-color)' }}>
                         <div className="timeline-dot" />
                         <div className="timeline-content" style={{ width: '100%' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>

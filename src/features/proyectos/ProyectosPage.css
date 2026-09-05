@@ -791,6 +791,15 @@
         .student-process-form input, .student-process-form textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-primary); background: var(--bg-secondary); resize: vertical; }
         .student-process-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
         .student-process-error { color: var(--accent-danger); font-size: .78rem; }
+        .student-process-form--biblioteca { border-color: var(--accent-primary); border-left: 3px solid var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-card)); }
+        .student-process-form--biblioteca strong { color: var(--accent-primary); }
+        .student-process-form-hint { margin: 0; color: var(--text-muted); font-size: .76rem; line-height: 1.5; }
+        .student-process-form--biblioteca .student-process-form-actions { justify-content: flex-start; }
+        .student-process-finalizado { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border: 1px solid var(--accent-success, #22c55e); border-left: 3px solid var(--accent-success, #22c55e); border-radius: var(--border-radius-md); background: color-mix(in srgb, #22c55e 8%, var(--bg-card)); }
+        .student-process-finalizado-icon { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-success, #22c55e); color: #fff; font-size: 1rem; font-weight: 700; }
+        .student-process-finalizado strong { display: block; color: #16a34a; font-size: .9rem; margin-bottom: 4px; }
+        .student-process-finalizado p { margin: 0; color: var(--text-secondary); font-size: .8rem; }
+        .student-process-finalizado-link { display: inline-block; margin-top: 8px; color: var(--accent-primary); font-size: .8rem; font-weight: 600; text-decoration: underline; }
 
         @media (max-width: 720px) {
           .student-research-process { padding: 18px 16px; }

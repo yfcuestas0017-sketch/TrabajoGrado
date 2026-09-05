@@ -173,3 +173,36 @@ CREATE TABLE public.program_periods (
 CREATE TRIGGER trg_audit_projects
 AFTER UPDATE ON public.projects
 FOR EACH ROW EXECUTE FUNCTION public.log_project_field_changes();
+
+-- BANCO DE PROYECTOS Y TRAZABILIDAD
+CREATE TABLE public.project_bank (
+    project_bank_id SERIAL PRIMARY KEY,
+    title VARCHAR(300) NOT NULL,
+    description TEXT NOT NULL,
+    general_objective TEXT,
+    specific_objectives TEXT,
+    research_line_id INTEGER REFERENCES public.research_lines(research_line_id),
+    research_subline_id INTEGER REFERENCES public.research_sublines(research_subline_id),
+    program_id INTEGER REFERENCES public.programs(program_id),
+    keywords VARCHAR(300),
+    observations TEXT,
+    proposer_id VARCHAR(50) NOT NULL REFERENCES public.users(user_id),
+    proposer_role VARCHAR(50) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'Disponible',
+    assigned_student_id VARCHAR(50) REFERENCES public.users(user_id),
+    assigned_at TIMESTAMP WITHOUT TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE public.project_bank_histories (
+    project_bank_history_id SERIAL PRIMARY KEY,
+    project_bank_id INTEGER NOT NULL REFERENCES public.project_bank(project_bank_id) ON DELETE RESTRICT,
+    user_id VARCHAR(50) NOT NULL REFERENCES public.users(user_id),
+    action VARCHAR(50) NOT NULL,
+    previous_status VARCHAR(50),
+    new_status VARCHAR(50),
+    changes JSONB,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
